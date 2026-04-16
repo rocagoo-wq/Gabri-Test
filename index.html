@@ -75,7 +75,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #0d0d12; /* Dunkler Hintergrund in der Lobby, man sieht die Map NICHT */
+            background: #0d0d12; /* Dunkler Hintergrund in der Lobby */
             z-index: 50;
             transition: opacity 0.3s ease;
         }
@@ -192,15 +192,26 @@
     </div>
 
     <div id="screens-layer">
+        
+        <!-- Screen 1: Login -->
         <div id="screen-login" class="screen glass-panel active">
             <h1>GABRI<br><span style="color:white; font-size: 16px;">FLUCHT</span></h1>
             <p class="text-gray-300 text-center mb-6 text-sm">Überlebe den Schulhof. Werde nicht zum Gabri.</p>
             <input type="text" id="playerNameInput" class="input-elite" placeholder="Dein Name" maxlength="12" autocomplete="off">
-            <button id="btnJoin" class="btn-elite">SPIEL BEITRETEN</button>
+            <button id="btnJoin" class="btn-elite">WEITER</button>
         </div>
 
+        <!-- Screen 1.5: Server Room -->
+        <div id="screen-room" class="screen glass-panel">
+            <h2 class="text-2xl font-bold text-center text-white mb-2">SERVER RAUM</h2>
+            <p class="text-gray-300 text-center mb-6 text-sm">Gib einen Code ein, um mit deinen Freunden zu spielen.</p>
+            <input type="text" id="roomCodeInput" class="input-elite uppercase" placeholder="Z.B. 1234" maxlength="6" autocomplete="off" style="text-transform: uppercase;">
+            <button id="btnJoinRoom" class="btn-elite">RAUM BETRETEN</button>
+        </div>
+
+        <!-- Screen 2: Lobby -->
         <div id="screen-lobby" class="screen glass-panel">
-            <h2 class="text-2xl font-bold text-center text-white mb-2">LOBBY</h2>
+            <h2 id="lobbyTitle" class="text-2xl font-bold text-center text-primary mb-2">LOBBY</h2>
             <p class="text-center text-gray-400 text-sm mb-4">Warte auf Mitspieler... (Namen in der Liste)</p>
             
             <div class="glass-panel player-list p-2" id="lobbyPlayerList"></div>
@@ -208,6 +219,7 @@
             <button id="btnStartGame" class="btn-elite">RUNDE STARTEN (3 MIN)</button>
         </div>
 
+        <!-- Screen 3: Leaderboard / Game Over -->
         <div id="screen-leaderboard" class="screen glass-panel">
             <h2 class="text-2xl font-bold text-center mb-1 text-white">RUNDE BEENDET</h2>
             <p class="text-center text-red-400 text-sm mb-6 font-semibold">Wer am längsten Gabri war, verliert!</p>
@@ -248,7 +260,7 @@
             console.error("Firebase konnte nicht geladen werden:", error);
         }
 
-        const GAME_DURATION_SEC = 180; // 3 Minuten in Sekunden
+        const GAME_DURATION_SEC = 180; // 3 Minuten
         const MAP_WIDTH = 2000;
         const MAP_HEIGHT = 2000;
         const PLAYER_SIZE = 48;
@@ -257,11 +269,13 @@
 
         let user = null;
         let myName = "Player";
+        let currentRoomId = null; // NEU: Der Server Raum
+        
         let serverPlayers = {}; 
         let gameEntities = {};  
         let gameState = { isPlaying: false, timeLeft: 0, currentGabri: null, hostId: null, roundId: null, tagCounter: 0 };
         
-        // Lokale Statusvariablen für perfekte Synchronisation (immun gegen Uhrzeit-Fehler)
+        // Lokale Statusvariablen für perfekte Synchronisation
         let currentRoundId = null;
         let localCurrentGabri = null;
         let localGabriSince = 0;
@@ -362,14 +376,16 @@
                 }
             } catch (e) {
                 alert("Firebase Fehler beim Login: " + e.message);
+                document.getElementById('btnJoin').innerText = "SPIEL BEITRETEN";
             }
         };
 
+        // SCHRITT 1: Name eingeben -> Wechselt zum Raum-Menü
         document.getElementById('btnJoin').addEventListener('click', async () => {
             const name = document.getElementById('playerNameInput').value.trim();
             if (!name) return;
             myName = name.substring(0, 12);
-            switchScreen('screen-lobby');
+            document.getElementById('btnJoin').innerText = "LÄDT...";
             await initAuth(); 
         });
 
@@ -377,45 +393,75 @@
             onAuthStateChanged(auth, (currentUser) => {
                 if (currentUser && myName !== "Player") {
                     user = currentUser;
-                    const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
-                    setDoc(playerRef, { id: user.uid, name: myName, x: 0, y: 0, timeAsGabri: 0, lastSeen: Date.now() });
-                    setupFirebaseListeners();
-                    requestAnimationFrame(gameLoop);
+                    switchScreen('screen-room'); // Wechsel zum neuen Raum-Fenster
                 }
             });
         }
 
-        function setupFirebaseListeners() {
-            if (!user) return; 
-            const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
-            const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
+        // SCHRITT 2: Raum beitreten -> Lobby
+        document.getElementById('btnJoinRoom').addEventListener('click', () => {
+            let code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if (!code) code = Math.random().toString(36).substring(2, 6).toUpperCase(); // Zufälliger Code, falls leer
+            
+            currentRoomId = code;
+            document.getElementById('lobbyTitle').innerText = "RAUM: " + currentRoomId;
 
+            // Spieler in die Datenbank einschreiben (MIT RAUM-ID)
+            const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+            setDoc(playerRef, { 
+                id: user.uid, 
+                name: myName, 
+                roomId: currentRoomId, 
+                x: 0, y: 0, 
+                timeAsGabri: 0, 
+                lastSeen: Date.now() 
+            });
+
+            setupFirebaseListeners();
+            requestAnimationFrame(gameLoop);
+            switchScreen('screen-lobby');
+        });
+
+
+        // --- 7. FIREBASE SYNC (MIT RAUM-FILTER) ---
+        function setupFirebaseListeners() {
+            if (!user || !currentRoomId) return; 
+            
+            const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
+            // Der GameState ist jetzt für jeden Raum einzeln!
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+
+            // Spieler Synchronisation
             onSnapshot(playersRef, (snapshot) => {
                 const now = Date.now();
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    if (now - data.lastSeen < 10000) {
+                    // FILTER: Wir speichern nur Spieler, die denselben Raum-Code haben
+                    if (data.roomId === currentRoomId && now - data.lastSeen < 10000) {
                         serverPlayers[doc.id] = data;
-                        if (!gameEntities[doc.id] && doc.id !== user.uid) gameEntities[doc.id] = { x: data.x, y: data.y };
+                        if (!gameEntities[doc.id] && doc.id !== user.uid) {
+                            gameEntities[doc.id] = { x: data.x, y: data.y };
+                        }
                     } else {
-                        delete serverPlayers[doc.id]; delete gameEntities[doc.id];
+                        // Lösche Spieler aus dem Bild, wenn sie einen anderen Raum haben oder inaktiv sind
+                        delete serverPlayers[doc.id]; 
+                        if (doc.id !== user.uid) delete gameEntities[doc.id];
                     }
                 });
                 updateLobbyUI();
             });
 
-            onSnapshot(stateRef, (docSnap) => {
+            // Spielstatus Synchronisation
+            onSnapshot(roomRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const newState = docSnap.data();
                     
-                    // Prüfen ob neue Runde gestartet wurde oder jemand getaggt wurde
                     if (newState.isPlaying && newState.roundId !== currentRoundId) {
                         currentRoundId = newState.roundId;
                         localCurrentGabri = newState.currentGabri;
                         localGabriSince = Date.now();
                         localTagCounter = newState.tagCounter;
                         
-                        // Setze mich auf zufällige Startposition
                         myLocalPlayer.x = Math.random() * (MAP_WIDTH - 200) + 100;
                         myLocalPlayer.y = Math.random() * (MAP_HEIGHT - 200) + 100;
                         camera.x = Math.max(0, Math.min(myLocalPlayer.x + PLAYER_SIZE/2 - canvasElement.width/2, MAP_WIDTH - canvasElement.width));
@@ -429,25 +475,26 @@
 
                     gameState = newState;
                     handleStateChange();
+                } else {
+                    // Falls der Raum noch komplett neu ist, läuft das Spiel logischerweise noch nicht
+                    gameState.isPlaying = false;
+                    handleStateChange();
                 }
             });
         }
 
-        // START BUTTON - Fehler-sicher gemacht
+        // START BUTTON
         document.getElementById('btnStartGame').addEventListener('click', async () => {
-            if (!user) {
-                alert("Fehler: Du bist noch nicht mit dem Server verbunden. Bitte warte kurz.");
-                return;
-            }
+            if (!user || !currentRoomId) return;
             
             try {
-                const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
                 const activeIds = Object.keys(serverPlayers);
                 if(activeIds.length === 0) activeIds.push(user.uid);
                 const randomGabri = activeIds[Math.floor(Math.random() * activeIds.length)];
 
-                // Host Timer-System: Der Host setzt das Spiel auf.
-                await setDoc(stateRef, {
+                // Raum wird in der Datenbank auf 'Spiel läuft' gesetzt
+                await setDoc(roomRef, {
                     isPlaying: true,
                     roundId: Math.random().toString(36).substring(2, 9),
                     currentGabri: randomGabri,
@@ -465,17 +512,18 @@
             }
         });
 
+        // RESTART BUTTON
         document.getElementById('btnRestart').addEventListener('click', () => {
-            const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
-            updateDoc(stateRef, { isPlaying: false });
+            if (!currentRoomId) return;
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            updateDoc(roomRef, { isPlaying: false });
         });
 
         function handleStateChange() {
             if (gameState.isPlaying && gameState.timeLeft > 0) {
-                // Spiel läuft
                 screensLayer.style.display = 'none';
                 uiLayer.style.display = 'flex';
-                document.body.classList.add('game-running'); // Zeigt Canvas
+                document.body.classList.add('game-running'); 
                 
                 if (localCurrentGabri === user.uid) {
                     hudStatusBox.classList.add('is-gabri-alert');
@@ -487,13 +535,11 @@
                 }
 
             } else if (gameState.isPlaying && gameState.timeLeft <= 0) {
-                // Spiel vorbei
                 if (screensLayer.style.display === 'none') {
                     showLeaderboard();
                 }
                 document.body.classList.remove('game-running');
             } else {
-                // Zurück in der Lobby
                 switchScreen('screen-lobby');
                 uiLayer.style.display = 'none';
                 document.body.classList.remove('game-running');
@@ -560,7 +606,7 @@
             });
         }
 
-        // --- 8. INPUT HANDLING (Virtual Joystick) ---
+        // --- 8. INPUT HANDLING ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let joystick = { active: false, id: null, cx: 0, cy: 0, nx: 0, ny: 0, dx: 0, dy: 0, maxRadius: 60 };
@@ -646,13 +692,13 @@
                 if (dist < PLAYER_SIZE * 0.9) { 
                     createParticles(p.x, p.y, '#ff3366'); 
                     const timeGained = now - localGabriSince;
-                    const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
+                    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
                     const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
                     
                     try {
                         Promise.all([
                             updateDoc(myRef, { timeAsGabri: increment(timeGained) }),
-                            updateDoc(stateRef, { currentGabri: id, tagCounter: increment(1) })
+                            updateDoc(roomRef, { currentGabri: id, tagCounter: increment(1) })
                         ]);
                     } catch(e) { console.error(e); }
                     break;
@@ -666,16 +712,15 @@
             const now = Date.now();
 
             if (user) {
-                // Host-Zentral-Timer tickt runter
+                // Host-Zentral-Timer tickt für genau diesen Raum runter
                 if (gameState.isPlaying && gameState.hostId === user.uid && gameState.timeLeft > 0) {
                     if (now - lastHostTick > 1000) {
                         lastHostTick = now;
-                        const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
-                        updateDoc(stateRef, { timeLeft: gameState.timeLeft - 1 }).catch(()=>{});
+                        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+                        updateDoc(roomRef, { timeLeft: gameState.timeLeft - 1 }).catch(()=>{});
                     }
                 }
 
-                // Spiellogik NUR, wenn das Spiel aktiv ist und das UI Layer unsichtbar ist
                 if (gameState.isPlaying && gameState.timeLeft > 0 && screensLayer.style.display === 'none') {
                     
                     let mx = joystick.dx * BASE_SPEED * dt;
@@ -701,7 +746,8 @@
                     if (now - lastSyncTime > 100) { 
                         lastSyncTime = now;
                         const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
-                        updateDoc(myRef, { x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y), lastSeen: now }).catch(()=>{});
+                        // RAUM-ID WIRD JEDES MAL BESTÄTIGT
+                        updateDoc(myRef, { x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y), lastSeen: now, roomId: currentRoomId }).catch(()=>{});
                     }
 
                     checkTags();
@@ -711,7 +757,6 @@
                     document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
                     document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(getTotalGabriTime(user.uid)/1000).toFixed(1)}s`;
                 
-                    // Render Graphics
                     render(dt, now);
                 }
             }
@@ -720,7 +765,6 @@
         }
 
         function render(dt, nowTime) {
-            // NPC Lehrer animieren (werden nur im Rendering bewegt)
             teachers.forEach(t => {
                 const offset = Math.sin(nowTime * t.speed);
                 t.currentX = t.startX + t.moveX * offset;
