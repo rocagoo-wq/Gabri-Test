@@ -23,6 +23,8 @@
             -webkit-user-select: none;
             -webkit-touch-callout: none;
             font-family: 'Outfit', sans-serif;
+            /* Wichtig für Mobile: Verhindert Markieren und Neuladen beim Wischen */
+            touch-action: none; 
         }
 
         body, html {
@@ -32,7 +34,7 @@
             height: 100%;
             background-color: #0d0d12;
             overflow: hidden;
-            touch-action: none; /* Verhindert Wischen/Zoomen auf Mobile */
+            position: fixed; /* iOS Bugfix für Scrollen */
         }
 
         canvas {
@@ -69,12 +71,15 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: radial-gradient(circle at center, rgba(13,13,18,0.8) 0%, rgba(5,5,8,0.95) 100%);
+            /* Halbdurchsichtig, damit man die Spieler in der Lobby im Hintergrund rumlaufen sieht */
+            background: rgba(13, 13, 18, 0.5);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             z-index: 50;
             transition: opacity 0.3s ease;
         }
 
-        .screen { display: none; width: 100%; max-width: 400px; padding: 20px; }
+        .screen { display: none; width: 100%; max-width: 400px; padding: 20px; pointer-events: auto; }
         .screen.active { display: block; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 
         @keyframes slideUp {
@@ -154,7 +159,7 @@
         }
 
         /* Player List Lobby */
-        .player-list { max-height: 200px; overflow-y: auto; margin-bottom: 20px; }
+        .player-list { max-height: 200px; overflow-y: auto; margin-bottom: 20px; pointer-events: auto; }
         .player-item {
             display: flex; align-items: center; justify-content: space-between;
             padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #ccc;
@@ -205,7 +210,7 @@
         <!-- Screen 2: Lobby -->
         <div id="screen-lobby" class="screen glass-panel">
             <h2 class="text-2xl font-bold text-center text-white mb-2">LOBBY</h2>
-            <p class="text-center text-gray-400 text-sm mb-4">Warte auf Mitspieler...</p>
+            <p class="text-center text-gray-400 text-sm mb-4">Warte auf Mitspieler... Du kannst dich schon bewegen!</p>
             
             <div class="glass-panel player-list p-2" id="lobbyPlayerList">
                 <!-- Spieler werden hier generiert -->
@@ -219,7 +224,7 @@
             <h2 class="text-2xl font-bold text-center mb-1 text-white">RUNDE BEENDET</h2>
             <p class="text-center text-red-400 text-sm mb-6 font-semibold">Wer am längsten Gabri war, verliert!</p>
             
-            <div id="leaderboardList" class="mb-6 max-h-[250px] overflow-y-auto">
+            <div id="leaderboardList" class="mb-6 max-h-[250px] overflow-y-auto pointer-events-auto">
                 <!-- Ranks hier -->
             </div>
 
@@ -234,16 +239,15 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- 1. FIREBASE SETUP (STRICT RULES APPLIED) ---
+        // --- 1. FIREBASE SETUP ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-elite-game';
         
         let firebaseConfig;
 
         if (typeof __firebase_config !== 'undefined') {
-            // Läuft hier im interaktiven Canvas automatisch
             firebaseConfig = JSON.parse(__firebase_config);
         } else {
-            // --- HIER DEINE DATEN VON FIREBASE EINTRAGEN FÜR VERCEL ---
+            // Deine originalen Keys
             firebaseConfig = {
                 apiKey: "AIzaSyDWM2Dnq72MeWuZcV3uT4YXg0G9nyZIVAc",
                 authDomain: "gabri-4f94c.firebaseapp.com",
@@ -252,7 +256,6 @@
                 messagingSenderId: "415746495575",
                 appId: "1:415746495575:web:c9730e19c9ac3e6d923f12"
             };
-            // ---------------------------------------------------------
         }
         
         let app, auth, db;
@@ -268,18 +271,17 @@
         const GAME_DURATION_MS = 3 * 60 * 1000;
         const MAP_WIDTH = 2000;
         const MAP_HEIGHT = 2000;
-        const PLAYER_SIZE = 48; // Etwas größer für bessere Sichtbarkeit
+        const PLAYER_SIZE = 48;
         const BASE_SPEED = 300; 
         const TAG_COOLDOWN_MS = 2000;
 
         // --- 3. STATE MANAGEMENT ---
         let user = null;
         let myName = "Player";
-        let serverPlayers = {}; // Rohe Daten vom Server
-        let gameEntities = {};  // Interpolierte Entitäten für flüssiges Rendering
+        let serverPlayers = {}; 
+        let gameEntities = {};  
         let gameState = { isPlaying: false, endTime: 0, currentGabri: null, gabriSince: 0, lastTagTime: 0 };
         
-        // Lokaler Spieler (Sofortige Reaktion)
         let myLocalPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
         
         let lastUpdateTime = performance.now();
@@ -294,27 +296,22 @@
         const screenLeaderboard = document.getElementById('screen-leaderboard');
         const hudStatusBox = document.getElementById('hudStatusBox');
         
-        // --- 4. MAP & OBSTACLES (Elite Design) ---
+        // --- 4. MAP & OBSTACLES ---
         const obstacles = [
-            // Außenwände (als visuelle Begrenzung)
             { x: -50, y: -50, w: MAP_WIDTH+100, h: 50, color: '#1a1a24' },
             { x: -50, y: MAP_HEIGHT, w: MAP_WIDTH+100, h: 50, color: '#1a1a24' },
             { x: -50, y: -50, w: 50, h: MAP_HEIGHT+100, color: '#1a1a24' },
             { x: MAP_WIDTH, y: -50, w: 50, h: MAP_HEIGHT+100, color: '#1a1a24' },
-            // Gebäude (Klassenzimmer, Halle)
             { x: 200, y: 200, w: 500, h: 300, color: '#1a1a24', glow: true, label: 'HAUPTGEBÄUDE' },
             { x: 1200, y: 150, w: 600, h: 400, color: '#1a1a24', glow: true, label: 'TURNHALLE' },
             { x: 300, y: 900, w: 400, h: 500, color: '#1a1a24', glow: true, label: 'MENSA' },
             { x: 1100, y: 1100, w: 500, h: 300, color: '#1a1a24', glow: true, label: 'BIBLIOTHEK' },
-            // Kleine Blöcke (Tische/Bäume)
             { x: 850, y: 400, w: 100, h: 100, color: '#2a2a36' },
             { x: 900, y: 700, w: 150, h: 80, color: '#2a2a36' },
             { x: 950, y: 1500, w: 100, h: 100, color: '#2a2a36' },
             { x: 1700, y: 700, w: 100, h: 250, color: '#2a2a36' }
         ];
 
-        // --- 4.5 CHAIRS & TEACHERS ---
-        // Pseudo-Random Generator (jeder Spieler generiert die Map exakt gleich!)
         function mulberry32(a) {
             return function() {
               var t = a += 0x6D2B79F5;
@@ -323,20 +320,17 @@
               return ((t ^ t >>> 14) >>> 0) / 4294967296;
             }
         }
-        const prng = mulberry32(9999); // Fester Seed für Synchronität
+        const prng = mulberry32(9999); 
         
-        // Generiere 40 zufällige Stühle auf dem Gelände
         for (let i = 0; i < 40; i++) {
             let cx = prng() * (MAP_WIDTH - 100) + 50;
             let cy = prng() * (MAP_HEIGHT - 100) + 50;
-            // Prüfen, ob Stuhl im Gebäude spawnt (wir wollen sie eher auf Wegen)
             let isInside = obstacles.some(obs => cx < obs.x + obs.w && cx + 30 > obs.x && cy < obs.y + obs.h && cy + 30 > obs.y);
             if (!isInside) {
                 obstacles.push({ x: cx, y: cy, w: 30, h: 30, color: '#5c4033', isChair: true });
             }
         }
 
-        // Lehrer (NPCs, die hin und her laufen)
         const teachers = [
             { startX: 750, startY: 300, moveX: 300, moveY: 0, speed: 0.001, name: "Herr Müller", currentX: 0, currentY: 0 },
             { startX: 1000, startY: 800, moveX: 0, moveY: 400, speed: 0.0015, name: "Frau Schmidt", currentX: 0, currentY: 0 },
@@ -344,10 +338,10 @@
             { startX: 1500, startY: 800, moveX: -200, moveY: 0, speed: 0.002, name: "Direktor", currentX: 0, currentY: 0 }
         ];
 
-        // --- 5. SPRITE GENERATOR (Pixel Art) ---
+        // --- 5. SPRITE GENERATOR ---
         function createPixelSprite(type) {
             const canvas = document.createElement('canvas');
-            const size = 12; // 12x12 Grid für mehr Details
+            const size = 12; 
             canvas.width = size; canvas.height = size;
             const ctx = canvas.getContext('2d');
             
@@ -357,21 +351,20 @@
             const skin = isGabri ? '#ff99aa' : (isTeacher ? '#eebb99' : '#ffcba4');
             const shirt = isGabri ? '#ff3366' : (isTeacher ? '#555555' : '#00ffcc');
             const pants = '#1a1a24';
-            const hair = isTeacher ? '#cccccc' : '#1a1a24'; // Lehrer haben graue Haare
-            const shadow = 'rgba(0,0,0,0.3)';
+            const hair = isTeacher ? '#cccccc' : '#1a1a24';
 
             const layout = [
-                [0,0,0,0,6,6,6,6,0,0,0,0], // 6 = Haare
+                [0,0,0,0,6,6,6,6,0,0,0,0],
                 [0,0,0,6,2,2,2,2,6,0,0,0],
-                [0,0,6,2,0,2,2,0,2,6,0,0], // Augen
+                [0,0,6,2,0,2,2,0,2,6,0,0],
                 [0,0,6,2,2,2,2,2,2,6,0,0],
                 [0,0,0,6,2,2,2,2,6,0,0,0],
-                [0,0,3,3,3,3,3,3,3,3,0,0], // Shirt
+                [0,0,3,3,3,3,3,3,3,3,0,0],
                 [0,3,3,3,3,3,3,3,3,3,3,0],
                 [0,3,3,3,3,3,3,3,3,3,3,0],
-                [0,3,0,4,4,4,4,4,4,0,3,0], // Hose
+                [0,3,0,4,4,4,4,4,4,0,3,0],
                 [0,0,0,4,4,0,0,4,4,0,0,0],
-                [0,0,5,5,0,0,0,0,5,5,0,0]  // Schuhe
+                [0,0,5,5,0,0,0,0,5,5,0,0]
             ];
 
             for(let y=0; y<11; y++) {
@@ -396,7 +389,10 @@
         const texGabri = createPixelSprite('gabri');
         const texTeacher = createPixelSprite('teacher');
 
-        // --- 6. AUTHENTICATION & INITIALIZATION ---
+        // --- 6. AUTHENTICATION & START ---
+        const canvasElement = document.getElementById('gameCanvas');
+        let camera = { x: 0, y: 0 };
+
         const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -406,24 +402,21 @@
                 }
             } catch (e) {
                 console.error("Auth failed:", e);
-                alert("Verbindungsfehler zur Datenbank. Überprüfe deine Firebase Config im Code!");
+                if (e.code === 'auth/operation-not-allowed') {
+                    alert("WICHTIG: Du musst in Firebase den Anbieter 'Anonym' aktivieren!");
+                } else {
+                    alert("Firebase Fehler: " + e.message);
+                }
             }
         };
 
-        // UI Event Listeners
         document.getElementById('btnJoin').addEventListener('click', async () => {
-            // Warnung für Vercel-Nutzer, wenn sie ihre Datenbank noch nicht verlinkt haben!
-            if (firebaseConfig.apiKey === "HIER_DEIN_API_KEY_EINTRAGEN") {
-                alert("WICHTIGER HINWEIS!\n\nDa du das Spiel nun auf Vercel hostest, brauchst du eine eigene Datenbank.\n\nDu musst im Code (Zeile ~184) deine eigene kopierte Firebase-Config einfügen. Ansonsten funktioniert der Multiplayer hier nicht!");
-                return;
-            }
-
             const name = document.getElementById('playerNameInput').value.trim();
             if (!name) return;
             myName = name.substring(0, 12);
             
             switchScreen('screen-lobby');
-            await initAuth(); // Start Auth ONLY after user clicks Join
+            await initAuth(); 
         });
 
         if (auth) {
@@ -431,11 +424,14 @@
                 if (currentUser && myName !== "Player") {
                     user = currentUser;
                     
-                    // Initiale Position
+                    // --- BUGFIX: Initiale Position setzen UND Kamera SOFORT zentrieren ---
                     myLocalPlayer.x = Math.random() * (MAP_WIDTH - 200) + 100;
                     myLocalPlayer.y = Math.random() * (MAP_HEIGHT - 200) + 100;
+                    
+                    // Kamera direkt anspringen, damit man beim Starten nicht das Nichts sieht!
+                    camera.x = Math.max(0, Math.min(myLocalPlayer.x + PLAYER_SIZE/2 - canvasElement.width/2, MAP_WIDTH - canvasElement.width));
+                    camera.y = Math.max(0, Math.min(myLocalPlayer.y + PLAYER_SIZE/2 - canvasElement.height/2, MAP_HEIGHT - canvasElement.height));
 
-                    // Erstelle mein Dokument in der DB (RULE 1)
                     const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
                     setDoc(playerRef, {
                         id: user.uid,
@@ -452,22 +448,19 @@
             });
         }
 
-        // --- 7. FIREBASE MULTIPLAYER LOGIC ---
+        // --- 7. FIREBASE SYNC ---
         function setupFirebaseListeners() {
-            if (!user) return; // RULE 3 Guard
+            if (!user) return; 
 
             const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
             const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
 
-            // Listen to Players
             onSnapshot(playersRef, (snapshot) => {
                 const now = Date.now();
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    // Cleanup inaktive Spieler (timeout 10s)
                     if (now - data.lastSeen < 10000) {
                         serverPlayers[doc.id] = data;
-                        // Initiiere Interpolations-Entität falls neu
                         if (!gameEntities[doc.id] && doc.id !== user.uid) {
                             gameEntities[doc.id] = { x: data.x, y: data.y };
                         }
@@ -477,23 +470,20 @@
                     }
                 });
                 updateLobbyUI();
-            }, (error) => console.error("Players Sync Error:", error));
+            });
 
-            // Listen to Game State
             onSnapshot(stateRef, (docSnap) => {
                 if (docSnap.exists()) {
                     gameState = docSnap.data();
                     handleStateChange();
                 }
-            }, (error) => console.error("Game State Error:", error));
+            });
         }
 
-        // Spiel starten
         document.getElementById('btnStartGame').addEventListener('click', async () => {
             if (!user) return;
             const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
             
-            // Random Gabri wählen
             const activeIds = Object.keys(serverPlayers);
             if(activeIds.length === 0) activeIds.push(user.uid);
             const randomGabri = activeIds[Math.floor(Math.random() * activeIds.length)];
@@ -506,14 +496,12 @@
                 lastTagTime: Date.now()
             });
 
-            // Zeiten zurücksetzen
             for(let id of activeIds) {
                 const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', id);
                 updateDoc(pRef, { timeAsGabri: 0, lastSeen: Date.now() });
             }
         });
 
-        // Restart (Zurück in Lobby)
         document.getElementById('btnRestart').addEventListener('click', () => {
             const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
             updateDoc(stateRef, { isPlaying: false });
@@ -523,11 +511,10 @@
             const now = Date.now();
             
             if (gameState.isPlaying && now < gameState.endTime) {
-                // Game Running
+                // Spiel läuft
                 screensLayer.style.display = 'none';
                 uiLayer.style.display = 'flex';
                 
-                // HUD Update (Visuelles Feedback, wenn man Gabri wird)
                 if (gameState.currentGabri === user.uid) {
                     hudStatusBox.classList.add('is-gabri-alert');
                     document.getElementById('roleDisplay').innerText = "DU BIST GABRI! FANG SIE!";
@@ -538,10 +525,10 @@
                 }
 
             } else if (gameState.isPlaying && now >= gameState.endTime) {
-                // Game Over -> Leaderboard
+                // Runde zu Ende
                 showLeaderboard();
             } else {
-                // Lobby
+                // Zurück zur Lobby
                 switchScreen('screen-lobby');
                 uiLayer.style.display = 'none';
             }
@@ -593,7 +580,6 @@
                 results.push({ name: serverPlayers[id].name, time: getTotalGabriTime(id), id: id });
             }
             
-            // Längste Zeit = Verlierer = Platz 1 der Straf-Liste
             results.sort((a, b) => b.time - a.time);
 
             const list = document.getElementById('leaderboardList');
@@ -620,7 +606,7 @@
             });
         }
 
-        // --- 8. INPUT HANDLING (Virtual Joystick) ---
+        // --- 8. INPUT HANDLING (Mobile/Touch Optimization) ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
@@ -629,14 +615,21 @@
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            // Wenn Resized wird, springt Kamera sanft wieder auf den Spieler
         }
         window.addEventListener('resize', resize);
         resize();
 
+        // Verhindern von Standard-Wischgesten auf Handys (Samsung/iOS)
+        document.body.addEventListener('touchmove', function(e) {
+            e.preventDefault(); 
+        }, { passive: false });
+
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             for(let touch of e.changedTouches) {
-                if(!joystick.active && touch.clientX < window.innerWidth) { // Überall aktivierbar
+                // Joystick kann überall gestartet werden, wo nicht UI blockiert
+                if(!joystick.active) { 
                     joystick.active = true;
                     joystick.id = touch.identifier;
                     joystick.cx = touch.clientX;
@@ -656,7 +649,6 @@
                     joystick.nx = touch.clientX;
                     joystick.ny = touch.clientY;
                     
-                    // Clamp visual stick
                     const dist = Math.hypot(joystick.nx - joystick.cx, joystick.ny - joystick.cy);
                     if (dist > joystick.maxRadius) {
                         const angle = Math.atan2(joystick.ny - joystick.cy, joystick.nx - joystick.cx);
@@ -693,14 +685,10 @@
             }
         }
 
-        // --- 9. GAME ENGINE (Physics, Collisions, Render) ---
-        let camera = { x: 0, y: 0 };
-
+        // --- 9. GAME ENGINE ---
         function checkWall(nx, ny) {
-            // Map boundaries
             if (nx < 0 || ny < 0 || nx + PLAYER_SIZE > MAP_WIDTH || ny + PLAYER_SIZE > MAP_HEIGHT) return true;
             
-            // Rect Obstacles (inklusive Stühle)
             for (let obs of obstacles) {
                 if (nx < obs.x + obs.w && nx + PLAYER_SIZE > obs.x &&
                     ny < obs.y + obs.h && ny + PLAYER_SIZE > obs.y) {
@@ -708,14 +696,12 @@
                 }
             }
             
-            // Lehrer Kollision (dynamische Wände)
             for (let t of teachers) {
                 if (nx < t.currentX + PLAYER_SIZE && nx + PLAYER_SIZE > t.currentX &&
                     ny < t.currentY + PLAYER_SIZE && ny + PLAYER_SIZE > t.currentY) {
                     return true;
                 }
             }
-            
             return false;
         }
 
@@ -738,22 +724,20 @@
                 if (id === user.uid) continue;
                 const p = gameEntities[id] || serverPlayers[id];
                 
-                // Distanz-Check (Zentrum zu Zentrum)
                 const cx1 = myLocalPlayer.x + PLAYER_SIZE/2;
                 const cy1 = myLocalPlayer.y + PLAYER_SIZE/2;
                 const cx2 = p.x + PLAYER_SIZE/2;
                 const cy2 = p.y + PLAYER_SIZE/2;
                 const dist = Math.hypot(cx2 - cx1, cy2 - cy1);
 
-                if (dist < PLAYER_SIZE * 0.9) { // Kollision!
-                    createParticles(p.x, p.y, '#ff3366'); // Visuelles Feedback lokal sofort
+                if (dist < PLAYER_SIZE * 0.9) { 
+                    createParticles(p.x, p.y, '#ff3366'); 
                     
                     const timeGained = now - gameState.gabriSince;
                     const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
                     const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
                     
                     try {
-                        // Parallel ausführen für Speed
                         Promise.all([
                             updateDoc(myRef, { timeAsGabri: increment(timeGained) }),
                             updateDoc(stateRef, { currentGabri: id, gabriSince: now, lastTagTime: now })
@@ -765,25 +749,19 @@
         }
 
         function gameLoop(timestamp) {
-            const dt = Math.min((timestamp - lastUpdateTime) / 1000, 0.1); // Max 100ms dt limitieren
+            const dt = Math.min((timestamp - lastUpdateTime) / 1000, 0.1); 
             lastUpdateTime = timestamp;
-
             const now = Date.now();
 
-            if (user && screensLayer.style.display === 'none' && gameState.isPlaying) {
-                // Lehrer Positionen aktualisieren (Zeitbasiert = Sync ohne Server)
-                teachers.forEach(t => {
-                    const time = now * t.speed;
-                    const offset = Math.sin(time);
-                    t.currentX = t.startX + t.moveX * offset;
-                    t.currentY = t.startY + t.moveY * offset;
-                });
+            if (user) {
+                // BUGFIX & NEUES FEATURE: 
+                // Bewegung, Kamera-Follow & Server-Sync passieren IMMER!
+                // Auch in der Lobby! (Man kann schon mal herumlaufen)
 
                 // 1. Lokale Physik updaten
                 let mx = joystick.dx * BASE_SPEED * dt;
                 let my = joystick.dy * BASE_SPEED * dt;
 
-                // X und Y Achse getrennt testen für Slide-Effekt an Wänden
                 if (!checkWall(myLocalPlayer.x + mx, myLocalPlayer.y)) myLocalPlayer.x += mx;
                 if (!checkWall(myLocalPlayer.x, myLocalPlayer.y + my)) myLocalPlayer.y += my;
 
@@ -793,23 +771,21 @@
                 camera.x += (targetCamX - camera.x) * 10 * dt;
                 camera.y += (targetCamY - camera.y) * 10 * dt;
 
-                // Kamera klemmen
                 camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width));
                 camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
 
-                // 3. Andere Spieler Interpolieren (Lerp)
+                // 3. Andere Spieler Interpolieren
                 for(let id in serverPlayers) {
                     if (id !== user.uid && gameEntities[id]) {
                         const targetX = serverPlayers[id].x;
                         const targetY = serverPlayers[id].y;
-                        // Interpoliere Position
                         gameEntities[id].x += (targetX - gameEntities[id].x) * 15 * dt;
                         gameEntities[id].y += (targetY - gameEntities[id].y) * 15 * dt;
                     }
                 }
 
                 // 4. Server Sync
-                if (now - lastSyncTime > 100) { // 10 FPS Sync
+                if (now - lastSyncTime > 100) { 
                     lastSyncTime = now;
                     const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
                     updateDoc(myRef, {
@@ -819,30 +795,37 @@
                     }).catch(()=>{});
                 }
 
-                // 5. Spiel Logik
-                checkTags();
+                // 5. Spiel Logik (NUR WENN SPIEL LÄUFT)
+                if (gameState.isPlaying && screensLayer.style.display === 'none') {
+                    checkTags();
 
-                // 6. HUD Update
-                const left = Math.max(0, gameState.endTime - now);
-                const min = Math.floor(left / 60000);
-                const sec = Math.floor((left % 60000) / 1000);
-                document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
-                document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(getTotalGabriTime(user.uid)/1000).toFixed(1)}s`;
+                    const left = Math.max(0, gameState.endTime - now);
+                    const min = Math.floor(left / 60000);
+                    const sec = Math.floor((left % 60000) / 1000);
+                    document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+                    document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(getTotalGabriTime(user.uid)/1000).toFixed(1)}s`;
+                }
             }
+
+            // Lehrer aktualisieren (immer, auch in Lobby)
+            teachers.forEach(t => {
+                const time = now * t.speed;
+                const offset = Math.sin(time);
+                t.currentX = t.startX + t.moveX * offset;
+                t.currentY = t.startY + t.moveY * offset;
+            });
 
             render(dt);
             requestAnimationFrame(gameLoop);
         }
 
         function render(dt) {
-            // Hintergrund
-            ctx.fillStyle = '#0d0d12'; // Dunkelgrau
+            ctx.fillStyle = '#0d0d12'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             ctx.save();
             ctx.translate(-camera.x, -camera.y);
 
-            // Floor Grid (Premium Effekt für Geschwindigkeitsgefühl)
             ctx.strokeStyle = 'rgba(255,255,255,0.03)';
             ctx.lineWidth = 2;
             const gridSize = 100;
@@ -858,24 +841,20 @@
             }
             ctx.stroke();
 
-            // Hindernisse & Stühle
             for(let obs of obstacles) {
                 ctx.fillStyle = obs.color;
                 
                 if (obs.isChair) {
-                    // Stuhl zeichnen
                     ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
                     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                    ctx.fillRect(obs.x + 2, obs.y + 2, obs.w - 4, obs.h - 4); // Sitzfläche
+                    ctx.fillRect(obs.x + 2, obs.y + 2, obs.w - 4, obs.h - 4); 
                     
-                    // Emoji für den Stuhl
                     ctx.fillStyle = 'white';
                     ctx.font = '16px "Outfit"';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText('🪑', obs.x + obs.w/2, obs.y + obs.h/2 + 2);
                 } else {
-                    // Normales Gebäude
                     ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
                     
                     if(obs.glow) {
@@ -883,7 +862,6 @@
                         ctx.lineWidth = 2;
                         ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
                         
-                        // Inneres Leuchten
                         ctx.strokeStyle = 'rgba(0, 255, 204, 0.1)';
                         ctx.lineWidth = 8;
                         ctx.strokeRect(obs.x+4, obs.y+4, obs.w-8, obs.h-8);
@@ -899,7 +877,6 @@
                 }
             }
 
-            // Partikel rendern
             for(let i=particles.length-1; i>=0; i--) {
                 let p = particles[i];
                 p.x += p.vx * dt;
@@ -915,15 +892,13 @@
                 ctx.globalAlpha = 1.0;
             }
 
-            // Lehrer rendern
             for(let t of teachers) {
                 ctx.shadowColor = 'rgba(0,0,0,0.5)';
                 ctx.shadowBlur = 10;
                 ctx.imageSmoothingEnabled = false;
                 ctx.drawImage(texTeacher, t.currentX, t.currentY, PLAYER_SIZE, PLAYER_SIZE);
-                ctx.shadowBlur = 0; // Reset
+                ctx.shadowBlur = 0;
 
-                // Namensschild Lehrer
                 ctx.fillStyle = '#aaaaaa';
                 ctx.font = '600 12px "Outfit"';
                 ctx.textAlign = 'center';
@@ -934,20 +909,17 @@
                 ctx.fillText(t.name, t.currentX + PLAYER_SIZE/2, t.currentY - 10);
             }
 
-            // Spieler rendern
             const nowTime = Date.now();
             for(let id in serverPlayers) {
                 const sp = serverPlayers[id];
                 const isMe = (id === user?.uid);
                 const isGabri = (id === gameState.currentGabri);
                 
-                // Koordinaten (Lokal vs Interpoliert)
                 let px = isMe ? myLocalPlayer.x : (gameEntities[id]?.x || sp.x);
                 let py = isMe ? myLocalPlayer.y : (gameEntities[id]?.y || sp.y);
 
-                // Gabri Aura & Schatten
-                if (isGabri) {
-                    const pulse = Math.abs(Math.sin(now * 0.005)) * 10;
+                if (isGabri && gameState.isPlaying) {
+                    const pulse = Math.abs(Math.sin(nowTime * 0.005)) * 10;
                     ctx.shadowColor = '#ff3366';
                     ctx.shadowBlur = 20 + pulse;
                 } else {
@@ -955,14 +927,12 @@
                     ctx.shadowBlur = 10;
                 }
 
-                // Sprite
                 ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(isGabri ? texGabri : texNormal, px, py, PLAYER_SIZE, PLAYER_SIZE);
-                ctx.shadowBlur = 0; // Reset shadow
+                ctx.drawImage(isGabri && gameState.isPlaying ? texGabri : texNormal, px, py, PLAYER_SIZE, PLAYER_SIZE);
+                ctx.shadowBlur = 0; 
 
-                // Cooldown Indikator (Ring um Gabri)
-                if (isGabri && now < gameState.lastTagTime + TAG_COOLDOWN_MS) {
-                    const progress = (now - gameState.lastTagTime) / TAG_COOLDOWN_MS;
+                if (isGabri && gameState.isPlaying && nowTime < gameState.lastTagTime + TAG_COOLDOWN_MS) {
+                    const progress = (nowTime - gameState.lastTagTime) / TAG_COOLDOWN_MS;
                     ctx.strokeStyle = 'rgba(255,255,255,0.5)';
                     ctx.lineWidth = 3;
                     ctx.beginPath();
@@ -970,26 +940,21 @@
                     ctx.stroke();
                 }
 
-                // Namensschild
-                ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
+                ctx.fillStyle = (isGabri && gameState.isPlaying) ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
                 ctx.font = '600 14px "Outfit"';
                 ctx.textAlign = 'center';
-                // Dunkler Hintergrund für Lesbarkeit
                 const textWidth = ctx.measureText(sp.name).width;
                 ctx.fillStyle = 'rgba(0,0,0,0.6)';
                 ctx.fillRect(px + PLAYER_SIZE/2 - textWidth/2 - 4, py - 24, textWidth + 8, 18);
                 
-                ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
+                ctx.fillStyle = (isGabri && gameState.isPlaying) ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
                 ctx.fillText(sp.name, px + PLAYER_SIZE/2, py - 10);
             }
 
-            ctx.restore(); // Kamera Transformation beenden
+            ctx.restore(); 
 
-            // Virtueller Joystick (On-Screen)
             if (joystick.active) {
                 ctx.save();
-                
-                // Outer ring
                 ctx.beginPath();
                 ctx.arc(joystick.cx, joystick.cy, joystick.maxRadius, 0, Math.PI*2);
                 ctx.fillStyle = 'rgba(255,255,255,0.05)';
@@ -998,14 +963,12 @@
                 ctx.fill();
                 ctx.stroke();
 
-                // Inner nub
                 ctx.beginPath();
                 ctx.arc(joystick.nx, joystick.ny, 25, 0, Math.PI*2);
                 ctx.fillStyle = 'rgba(0, 255, 204, 0.4)';
                 ctx.shadowColor = '#00ffcc';
                 ctx.shadowBlur = 15;
                 ctx.fill();
-
                 ctx.restore();
             }
         }
