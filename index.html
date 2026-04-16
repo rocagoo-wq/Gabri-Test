@@ -312,9 +312,10 @@
         let gameEntities = {};  
         let gameState = { 
             isPlaying: false, timeLeft: 0, currentGabri: null, hostId: null, roundId: null, tagCounter: 0,
-            ball_x: 2200, ball_y: 1500, ball_owner: null, ball_ts: 0, ball_startX: 2200, ball_startY: 1500,
-            boss_active: false, boss_hp: 100, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
-            sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null
+            ball_x: 2200, ball_y: 1500, ball_vx: 0, ball_vy: 0, ball_owner: null, ball_ts: 0,
+            boss_active: false, boss_hp: 500, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
+            sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null,
+            mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null
         };
         
         let currentRoundId = null;
@@ -325,13 +326,21 @@
         let lastStairTime = 0; 
         let lastConfettiTs = 0;
 
+        // Lokale Ball-Physik für perfekte Sync ohne Server-Lag
+        let localBall = { active: false, x: 2200, y: 1500, z: 0, vx: 0, vy: 0, vz: 0 };
+        let lastBallTs = 0;
+
         let myLocalPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
         let myFacing = { x: 1, y: 0 }; 
         let myHeldItem = null; 
         
-        // Dash variables
         let dashSpeedMult = 1.0;
         let lastDashTime = 0;
+        let lastMgShot = 0;
+        
+        let kb_vx = 0;
+        let kb_vy = 0;
+        let lastKnockbackTs = 0;
 
         let lastUpdateTime = performance.now();
         let lastSyncTime = 0;
@@ -356,6 +365,17 @@
             sword3: {x: 1300, y: 3100},
             sword4: {x: 1700, y: 3100}
         };
+
+        const mapPallets = [
+            { id: 'p1', dropRect: {x: 1060, y: 400, w: 40, h: 200}, upRect: {x: 1070, y: 380, w: 20, h: 20}, dir: 'v' }, 
+            { id: 'p2', dropRect: {x: 1500, y: 400, w: 40, h: 200}, upRect: {x: 1510, y: 380, w: 20, h: 20}, dir: 'v' }, 
+            { id: 'p3', dropRect: {x: 500, y: 1160, w: 200, h: 40}, upRect: {x: 480, y: 1170, w: 20, h: 20}, dir: 'h' }, 
+            { id: 'p4', dropRect: {x: 2000, y: 1160, w: 200, h: 40}, upRect: {x: 1980, y: 1170, w: 20, h: 20}, dir: 'h' }, 
+            { id: 'p5', dropRect: {x: 1060, y: 2400, w: 40, h: 200}, upRect: {x: 1070, y: 2380, w: 20, h: 20}, dir: 'v' }, 
+            { id: 'p6', dropRect: {x: 1500, y: 2400, w: 40, h: 200}, upRect: {x: 1510, y: 2380, w: 20, h: 20}, dir: 'v' }, 
+            { id: 'p7', dropRect: {x: 500, y: 3160, w: 200, h: 40}, upRect: {x: 480, y: 3170, w: 20, h: 20}, dir: 'h' }, 
+            { id: 'p8', dropRect: {x: 2000, y: 3160, w: 200, h: 40}, upRect: {x: 1980, y: 3170, w: 20, h: 20}, dir: 'h' }  
+        ];
 
         obstacles.push({x: -50, y: -50, w: MAP_WIDTH+100, h: 50, isWall: true});
         obstacles.push({x: -50, y: -50, w: 50, h: 2000+100, isWall: true});
@@ -390,7 +410,6 @@
             if (labelText) labels.push({x: rx + rw/2, y: ry + rh/2, text: labelText});
 
             if (!isEmptyRoom) {
-                // Mehr Platz zwischen den Tischen (220px statt 140px)
                 let cols = Math.floor((rw - wall*2) / 220);
                 let rows = Math.floor((rh - wall*2) / 220);
                 let padX = (rw - wall*2 - (cols * 220)) / 2;
@@ -408,8 +427,6 @@
             }
         }
 
-        // --- VERGRÖSSERTE MAP ---
-        // Linke Räume enden bei X=1100. Rechte Räume starten bei X=1500. Flur ist 400px breit!
         buildRoom(100, 100, 1000, 800, 'right', 300, 200, 'MATHE (EG)');
         buildRoom(1500, 100, 1400, 800, 'left', 300, 200, 'BIOLOGIE (EG)');
         buildRoom(100, 1200, 1000, 700, 'top', 400, 200, 'MENSA (EG)');
@@ -420,7 +437,6 @@
         buildRoom(100, 3200, 1000, 700, 'top', 400, 200, 'LEHRERZIMMER (OG)');
         buildRoom(1500, 3200, 1400, 700, 'top', 500, 200, 'BIBLIOTHEK (OG)');
 
-        // Treppen perfekt im mittleren Flur platziert (Flurmitte ist X=1300)
         stairs.push({ x: 1225, y: 400, w: 150, h: 150, targetY: 2400, label: 'ZUM OG' });
         stairs.push({ x: 1225, y: 2400, w: 150, h: 150, targetY: 400, label: 'ZUM EG' });
         stairs.push({ x: 1225, y: 1500, w: 150, h: 150, targetY: 3500, label: 'ZUM OG' });
@@ -432,7 +448,6 @@
             { startX: 1300, startY: 2800, moveX: 0, moveY: 500, speed: 0.0012, name: "Herr Weber", currentX: 0, currentY: 0 }
         ];
 
-        // ANIMIERTE SPRITES
         function createPixelSprite(type, frame=0) {
             const canvas = document.createElement('canvas');
             canvas.width = 12; canvas.height = 12;
@@ -567,8 +582,29 @@
                         localGabriSince = Date.now();
                     }
                     
+                    // Knockback Check für Laser-Treffer
+                    if (newState[`knockback_${user.uid}`]) {
+                        const kb = newState[`knockback_${user.uid}`];
+                        if (kb.ts !== lastKnockbackTs) {
+                            lastKnockbackTs = kb.ts;
+                            kb_vx = kb.vx; kb_vy = kb.vy;
+                            createParticles(myLocalPlayer.x, myLocalPlayer.y, '#ff0000');
+                        }
+                    }
+
+                    // Item Sync Check
                     if (myHeldItem === 'ball' && newState.ball_owner !== user.uid) myHeldItem = null;
+                    if (myHeldItem === 'mg' && newState.mg_owner !== user.uid) myHeldItem = null;
                     if (myHeldItem && myHeldItem.startsWith('sword') && newState[myHeldItem+'_owner'] !== user.uid) myHeldItem = null;
+
+                    // Ball Physics Start Check
+                    if (newState.ball_ts !== lastBallTs) {
+                        lastBallTs = newState.ball_ts;
+                        localBall.active = true;
+                        localBall.x = newState.ball_x; localBall.y = newState.ball_y;
+                        localBall.vx = newState.ball_vx || 0; localBall.vy = newState.ball_vy || 0;
+                        localBall.z = 40; localBall.vz = 350; // Wurfstärke nach oben
+                    }
 
                     gameState = newState;
                     handleStateChange();
@@ -587,16 +623,21 @@
                 if(activeIds.length === 0) activeIds.push(user.uid);
                 const randomGabri = activeIds[Math.floor(Math.random() * activeIds.length)];
 
+                let initialPallets = {};
+                mapPallets.forEach(p => initialPallets['pallet_'+p.id] = 0);
+
                 await setDoc(roomRef, {
+                    ...initialPallets,
                     isPlaying: true,
                     roundId: Math.random().toString(36).substring(2, 9),
                     currentGabri: randomGabri,
                     tagCounter: 0,
                     hostId: user.uid,
                     timeLeft: GAME_DURATION_SEC,
-                    ball_x: 2200, ball_y: 1500, ball_owner: null, ball_ts: 0, ball_startX: 2200, ball_startY: 1500,
-                    boss_active: false, boss_hp: 100, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
-                    sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null
+                    ball_x: 2200, ball_y: 1500, ball_vx: 0, ball_vy: 0, ball_owner: null, ball_ts: 0,
+                    boss_active: false, boss_hp: 500, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
+                    sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null,
+                    mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null
                 });
 
                 for(let id of activeIds) {
@@ -711,8 +752,8 @@
                 if (key === 'shift') keys['shift'] = true;
                 else keys[key] = true;
                 
-                if (key === ' ' || key === 'spacebar') { btnA.active = true; doActionA(); }
-                if (key === 'shift') { btnB.active = true; doActionB(); }
+                if (key === ' ' || key === 'spacebar') { if(!btnA.active) doActionA(); btnA.active = true; }
+                if (key === 'shift') { if(!btnB.active) doActionB(); btnB.active = true; }
             }
         });
         window.addEventListener('keyup', (e) => {
@@ -806,58 +847,132 @@
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
             const cx = myLocalPlayer.x + PLAYER_SIZE/2;
             const cy = myLocalPlayer.y + PLAYER_SIZE/2;
+            const isGabri = (localCurrentGabri === user.uid);
+            const now = Date.now();
+            
+            // PRIO 1: PALLETS (DbD Style)
+            let nearestPallet = null; let minDistP = 120;
+            for (let p of mapPallets) {
+                let pcx = p.dropRect.x + p.dropRect.w/2; let pcy = p.dropRect.y + p.dropRect.h/2;
+                let d = Math.hypot(cx - pcx, cy - pcy);
+                if (d < minDistP) { minDistP = d; nearestPallet = p; }
+            }
 
-            if (myHeldItem === 'ball') {
-                // Werfen (Auto-Aim auf Korb, wenn grob in die Richtung)
-                let tgtX = cx + myFacing.x * 500;
-                let tgtY = cy + myFacing.y * 500;
-                
-                // Befinden wir uns in der Halle?
-                if (cx > 1500 && cy < 2000 && myFacing.x > 0) {
-                    tgtX = hoop.x + hoop.w/2;
-                    tgtY = hoop.y + 10;
+            if (nearestPallet) {
+                const pState = gameState['pallet_'+nearestPallet.id] || 0;
+                if (pState === 0) {
+                    let up = {}; up['pallet_'+nearestPallet.id] = 1; updateDoc(roomRef, up);
+                    createParticles(nearestPallet.dropRect.x + nearestPallet.dropRect.w/2, nearestPallet.dropRect.y + nearestPallet.dropRect.h/2, '#8b5a2b');
+                    return; 
+                } else if (pState === 1) {
+                    const moveVec = getMovementVector();
+                    const isMoving = (Math.abs(moveVec.dx) > 0.1 || Math.abs(moveVec.dy) > 0.1);
+
+                    if (isGabri || !isMoving) {
+                        let up = {}; up['pallet_'+nearestPallet.id] = 2; updateDoc(roomRef, up);
+                        createParticles(nearestPallet.dropRect.x + nearestPallet.dropRect.w/2, nearestPallet.dropRect.y + nearestPallet.dropRect.h/2, '#ffcc00');
+                        return;
+                    } else {
+                        const isVert = nearestPallet.dir === 'v';
+                        if (isVert) {
+                            if (myLocalPlayer.x < nearestPallet.dropRect.x) myLocalPlayer.x = nearestPallet.dropRect.x + nearestPallet.dropRect.w + 10;
+                            else myLocalPlayer.x = nearestPallet.dropRect.x - PLAYER_SIZE - 10;
+                        } else {
+                            if (myLocalPlayer.y < nearestPallet.dropRect.y) myLocalPlayer.y = nearestPallet.dropRect.y + nearestPallet.dropRect.h + 10;
+                            else myLocalPlayer.y = nearestPallet.dropRect.y - PLAYER_SIZE - 10;
+                        }
+                        createParticles(cx, cy, '#00ffcc');
+                        return;
+                    }
                 }
+            }
 
+            // PRIO 2: ITEMS BENUTZEN
+            if (myHeldItem === 'ball') {
+                // Ball werfen mit Velocity
                 myHeldItem = null;
                 updateDoc(roomRef, {
-                    'ball_owner': null, 'ball_x': tgtX, 'ball_y': tgtY,
-                    'ball_startX': cx, 'ball_startY': cy, 'ball_ts': Date.now()
+                    'ball_owner': null, 
+                    'ball_x': cx, 'ball_y': cy, 
+                    'ball_vx': myFacing.x * 1200, 'ball_vy': myFacing.y * 1200,
+                    'ball_ts': now
                 });
+                return;
+            } else if (myHeldItem === 'mg') {
+                // MG Schießen (Hitscan Laser + Knockback)
+                if (now - lastMgShot < 150) return; // Feuerrate
+                lastMgShot = now;
+                
+                let hitTarget = null;
+                let lx = cx; let ly = cy;
+                
+                // Raycast in Blickrichtung
+                for(let i=0; i<20; i++) {
+                    lx += myFacing.x * 40; ly += myFacing.y * 40;
+                    if (checkWall(lx, ly)) break; // Wand getroffen
+                    
+                    // Boss getroffen?
+                    if (gameState.boss_active && gameState.boss_hp > 0 && cy > 2000) {
+                        if (Math.hypot(lx - (gameState.boss_x+60), ly - (gameState.boss_y+60)) < 70) {
+                            hitTarget = 'boss'; break;
+                        }
+                    }
+                    // Spieler getroffen?
+                    for(let id in serverPlayers) {
+                        if (id === user.uid) continue;
+                        let p = serverPlayers[id];
+                        let sameFloor = (cy > 2000 && p.y > 2000) || (cy < 2000 && p.y < 2000);
+                        if (sameFloor && Math.hypot(lx - (p.x+20), ly - (p.y+20)) < 30) {
+                            hitTarget = id; break;
+                        }
+                    }
+                    if (hitTarget) break;
+                }
+
+                let updates = { last_laser: { x1: cx, y1: cy, x2: lx, y2: ly, ts: now } };
+                if (hitTarget) {
+                    if (hitTarget === 'boss') {
+                        updates.boss_hp = increment(-10);
+                    } else {
+                        // Spieler extrem stark wegstoßen
+                        updates[`knockback_${hitTarget}`] = { vx: myFacing.x * 1800, vy: myFacing.y * 1800, ts: now };
+                    }
+                }
+                updateDoc(roomRef, updates);
+                return;
+
             } else if (myHeldItem && myHeldItem.startsWith('sword')) {
-                // Boss attackieren
                 createParticles(cx + myFacing.x*30, cy + myFacing.y*30, '#ffffff'); 
                 if (gameState.boss_active && gameState.boss_hp > 0) {
                     const distToBoss = Math.hypot(cx - (gameState.boss_x + 60), cy - (gameState.boss_y + 60));
                     if (distToBoss < 150) {
-                        updateDoc(roomRef, { 'boss_hp': increment(-15) });
+                        updateDoc(roomRef, { 'boss_hp': increment(-20) }); // Schwert macht mehr Schaden
                         createParticles(gameState.boss_x + 60, gameState.boss_y + 60, '#ffcc00'); 
                     }
                 }
-            } else {
-                // Aufheben
-                if (!gameState.ball_owner && Math.hypot(cx - gameState.ball_x, cy - gameState.ball_y) < 100) {
-                    myHeldItem = 'ball';
-                    updateDoc(roomRef, { 'ball_owner': user.uid });
-                    return;
-                }
-                for (let i = 1; i <= 4; i++) {
-                    const sKey = 'sword' + i;
-                    const sBase = swordBases[sKey];
-                    if (!gameState[sKey+'_owner'] && Math.hypot(cx - sBase.x, cy - sBase.y) < 100) {
-                        myHeldItem = sKey;
-                        let update = {}; update[sKey+'_owner'] = user.uid;
-                        updateDoc(roomRef, update);
-                        return;
-                    }
+                return;
+            }
+
+            // PRIO 3: ITEMS AUFHEBEN
+            if (!gameState.ball_owner && Math.hypot(cx - gameState.ball_x, cy - gameState.ball_y) < 100) {
+                myHeldItem = 'ball'; updateDoc(roomRef, { 'ball_owner': user.uid }); return;
+            }
+            if (gameState.mg_dropped && !gameState.mg_owner && Math.hypot(cx - gameState.mg_x, cy - gameState.mg_y) < 100) {
+                myHeldItem = 'mg'; updateDoc(roomRef, { mg_owner: user.uid }); return;
+            }
+            for (let i = 1; i <= 4; i++) {
+                const sKey = 'sword' + i; const sBase = swordBases[sKey];
+                if (!gameState[sKey+'_owner'] && Math.hypot(cx - sBase.x, cy - sBase.y) < 100) {
+                    myHeldItem = sKey;
+                    let update = {}; update[sKey+'_owner'] = user.uid; updateDoc(roomRef, update); return;
                 }
             }
         }
 
         function doActionB() {
-            // DASH!
             const now = Date.now();
             if (now - lastDashTime > 2000 && (Math.abs(myFacing.x) > 0 || Math.abs(myFacing.y) > 0)) {
-                dashSpeedMult = 3.0; // 3x Geschwindigkeit
+                dashSpeedMult = 4.0; 
                 lastDashTime = now;
                 createParticles(myLocalPlayer.x + PLAYER_SIZE/2, myLocalPlayer.y + PLAYER_SIZE/2, '#00ffcc');
             }
@@ -867,6 +982,11 @@
             if (nx < 0 || ny < 0 || nx + PLAYER_SIZE > MAP_WIDTH || ny + PLAYER_SIZE > MAP_HEIGHT) return true;
             for (let obs of obstacles) {
                 if (nx < obs.x + obs.w && nx + PLAYER_SIZE > obs.x && ny < obs.y + obs.h && ny + PLAYER_SIZE > obs.y) return true;
+            }
+            for (let p of mapPallets) {
+                if (gameState['pallet_'+p.id] === 1) { 
+                    if (nx < p.dropRect.x + p.dropRect.w && nx + PLAYER_SIZE > p.dropRect.x && ny < p.dropRect.y + p.dropRect.h && ny + PLAYER_SIZE > p.dropRect.y) return true;
+                }
             }
             return false;
         }
@@ -926,12 +1046,18 @@
                         lastHostTick = now;
                         let updates = { timeLeft: gameState.timeLeft - 1 };
                         
-                        // Boss Spawnt bei 60s
-                        if (updates.timeLeft <= 60 && !gameState.boss_active && gameState.boss_hp > 0) {
+                        if (updates.timeLeft <= 60 && !gameState.boss_active && gameState.boss_hp > 0 && !gameState.mg_dropped) {
                             updates.boss_active = true;
                         }
                         
-                        // Boss KI
+                        // Boss Defeat Drop
+                        if (gameState.boss_active && gameState.boss_hp <= 0 && !gameState.mg_dropped) {
+                            updates.boss_active = false;
+                            updates.mg_dropped = true;
+                            updates.mg_x = gameState.boss_x + 60;
+                            updates.mg_y = gameState.boss_y + 60;
+                        }
+
                         if (gameState.boss_active && gameState.boss_hp > 0) {
                             let nearestId = null; let minDist = 9999;
                             for (let id in serverPlayers) {
@@ -948,7 +1074,6 @@
                                 updates.boss_x = updates.boss_tx; 
                             }
                         }
-
                         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
                         updateDoc(roomRef, updates).catch(()=>{});
                     }
@@ -958,14 +1083,11 @@
                     
                     const move = getMovementVector();
                     
-                    // Dash Cooldown/Decay
-                    if (dashSpeedMult > 1.0) {
-                        dashSpeedMult -= dt * 5;
-                        if (dashSpeedMult < 1.0) dashSpeedMult = 1.0;
-                    }
+                    if (dashSpeedMult > 1.0) { dashSpeedMult -= dt * 6; if (dashSpeedMult < 1.0) dashSpeedMult = 1.0; }
 
-                    let mx = move.dx * BASE_SPEED * dashSpeedMult * dt;
-                    let my = move.dy * BASE_SPEED * dashSpeedMult * dt;
+                    let mx = (move.dx * BASE_SPEED * dashSpeedMult + kb_vx) * dt;
+                    let my = (move.dy * BASE_SPEED * dashSpeedMult + kb_vy) * dt;
+                    kb_vx *= 0.85; kb_vy *= 0.85; // Knockback Friction
 
                     if (Math.abs(move.dx) > 0.1 || Math.abs(move.dy) > 0.1) {
                         const len = Math.hypot(move.dx, move.dy);
@@ -977,12 +1099,39 @@
 
                     checkStairs(myLocalPlayer.x, myLocalPlayer.y, now);
 
-                    // Boss Kollision
                     if (gameState.boss_active && gameState.boss_hp > 0 && myLocalPlayer.y > 2000) {
                         if (Math.hypot(myLocalPlayer.x - gameState.boss_x, myLocalPlayer.y - gameState.boss_y) < 100) {
-                            myLocalPlayer.x -= myFacing.x * 150; 
-                            myLocalPlayer.y -= myFacing.y * 150;
+                            myLocalPlayer.x -= myFacing.x * 200; 
+                            myLocalPlayer.y -= myFacing.y * 200;
                             createParticles(myLocalPlayer.x, myLocalPlayer.y, '#ff0000');
+                        }
+                    }
+
+                    // LOKALE BALL PHYSIK (Smooth & Bouncy)
+                    if (!gameState.ball_owner && localBall.active) {
+                        let bnx = localBall.x + localBall.vx * dt;
+                        let bny = localBall.y + localBall.vy * dt;
+                        let hitX = checkWall(bnx, localBall.y);
+                        let hitY = checkWall(localBall.x, bny);
+                        
+                        if (hitX) localBall.vx *= -0.7; else localBall.x = bnx;
+                        if (hitY) localBall.vy *= -0.7; else localBall.y = bny;
+                        
+                        localBall.vx *= 0.98; localBall.vy *= 0.98; // Friction
+                        
+                        localBall.vz -= 800 * dt; // Gravity
+                        localBall.z += localBall.vz * dt;
+                        if (localBall.z < 0) {
+                            localBall.z = 0;
+                            if (localBall.vz < -50) localBall.vz *= -0.6; else { localBall.vz = 0; localBall.vx *= 0.9; localBall.vy *= 0.9; }
+                        }
+
+                        // Korb Check
+                        if (localBall.z > 80 && Math.hypot(localBall.x - (hoop.x + hoop.w/2), localBall.y - (hoop.y + 10)) < 40) {
+                            if (now - lastConfettiTs > 1000) {
+                                spawnConfetti(hoop.x + hoop.w/2, hoop.y + 10);
+                                lastConfettiTs = now;
+                            }
                         }
                     }
 
@@ -1067,7 +1216,22 @@
                 }
             }
 
-            // Basketballkorb 
+            for(let p of mapPallets) {
+                const pState = gameState['pallet_'+p.id] || 0;
+                if (pState === 0) { 
+                    ctx.fillStyle = '#5c3a21'; ctx.fillRect(p.upRect.x, p.upRect.y, p.upRect.w, p.upRect.h);
+                } else if (pState === 1) { 
+                    ctx.fillStyle = '#8b5a2b'; ctx.fillRect(p.dropRect.x, p.dropRect.y, p.dropRect.w, p.dropRect.h);
+                    ctx.fillStyle = '#5c3a21';
+                    if (p.dropRect.w > p.dropRect.h) { for(let i=0; i<5; i++) ctx.fillRect(p.dropRect.x + i*40 + 10, p.dropRect.y, 10, p.dropRect.h); } 
+                    else { for(let i=0; i<5; i++) ctx.fillRect(p.dropRect.x, p.dropRect.y + i*40 + 10, p.dropRect.w, 10); }
+                } else if (pState === 2) { 
+                    ctx.fillStyle = '#8b5a2b';
+                    ctx.fillRect(p.dropRect.x + 10, p.dropRect.y + 10, 20, 10);
+                    ctx.fillRect(p.dropRect.x + p.dropRect.w - 30, p.dropRect.y + p.dropRect.h - 20, 20, 10);
+                }
+            }
+
             if (!isInOG) {
                 ctx.fillStyle = '#ffffff'; ctx.fillRect(hoop.x, hoop.y - 10, hoop.w, 10); 
                 ctx.strokeStyle = '#ff6600'; ctx.lineWidth = 4; ctx.beginPath();
@@ -1090,7 +1254,12 @@
                 }
             }
 
-            // Boss Ishin
+            // MG Drop Rendern
+            if (isInOG && gameState.mg_dropped && !gameState.mg_owner) {
+                ctx.fillStyle = '#444'; ctx.fillRect(gameState.mg_x - 15, gameState.mg_y, 30, 8); // Lauf
+                ctx.fillStyle = '#222'; ctx.fillRect(gameState.mg_x - 5, gameState.mg_y + 8, 10, 10); // Griff
+            }
+
             if (isInOG && gameState.boss_active && gameState.boss_hp > 0) {
                 let bx = gameState.boss_x; let by = gameState.boss_y;
                 if (gameEntities['boss']) {
@@ -1101,9 +1270,8 @@
 
                 ctx.imageSmoothingEnabled = false;
                 let bFrame = Math.floor(nowTime / 250) % 2;
-                ctx.drawImage(texBoss[bFrame], bx, by, 120, 120); // Boss ist RIESIG
+                ctx.drawImage(texBoss[bFrame], bx, by, 120, 120); 
                 
-                // Globale Warnung zeichnen, falls kürzlich gespawnt
                 if (gameState.timeLeft > 55) {
                     ctx.fillStyle = 'rgba(255,0,0,0.5)';
                     ctx.font = 'bold 60px "Press Start 2P"'; ctx.textAlign = 'center';
@@ -1111,28 +1279,27 @@
                 }
                 
                 ctx.fillStyle = '#ff0000'; ctx.fillRect(bx, by - 20, 120, 12);
-                ctx.fillStyle = '#00ffcc'; ctx.fillRect(bx, by - 20, 120 * (gameState.boss_hp/100), 12);
+                ctx.fillStyle = '#00ffcc'; ctx.fillRect(bx, by - 20, 120 * (gameState.boss_hp/500), 12);
                 ctx.fillStyle = '#ffffff'; ctx.font = 'bold 16px "Outfit"'; ctx.textAlign = 'center';
                 ctx.fillText("ISHIN", bx + 60, by - 30);
             }
 
-            // Ball
-            let drawBallX = gameState.ball_x; let drawBallY = gameState.ball_y; let drawBallZ = 0;
+            // Laser Strahl Rendern
+            if (gameState.last_laser && nowTime - gameState.last_laser.ts < 150) {
+                ctx.strokeStyle = 'rgba(255, 51, 102, 0.8)'; // Neon Rot
+                ctx.lineWidth = 6;
+                ctx.beginPath();
+                ctx.moveTo(gameState.last_laser.x1, gameState.last_laser.y1);
+                ctx.lineTo(gameState.last_laser.x2, gameState.last_laser.y2);
+                ctx.stroke();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); // Innerer Strahl
+            }
+
+            // Ball Rendern (Mit lokaler Physik)
+            let drawBallX = localBall.x; let drawBallY = localBall.y; let drawBallZ = localBall.z;
             if (gameState.ball_owner) {
                 const owner = serverPlayers[gameState.ball_owner] || (gameState.ball_owner === user.uid ? myLocalPlayer : null);
-                if (owner) { drawBallX = owner.x + 20; drawBallY = owner.y - 20; drawBallZ = 0; } // Über dem Kopf
-            } else if (nowTime - gameState.ball_ts < 800) {
-                const p = (nowTime - gameState.ball_ts) / 800;
-                drawBallX = gameState.ball_startX + (gameState.ball_x - gameState.ball_startX) * p;
-                drawBallY = gameState.ball_startY + (gameState.ball_y - gameState.ball_startY) * p;
-                drawBallZ = Math.sin(p * Math.PI) * 200; 
-                
-                if (p > 0.9 && gameState.ball_ts !== lastConfettiTs) {
-                    if (Math.hypot(drawBallX - (hoop.x + hoop.w/2), drawBallY - (hoop.y + 10)) < 60) {
-                        spawnConfetti(hoop.x + hoop.w/2, hoop.y + 10);
-                    }
-                    lastConfettiTs = gameState.ball_ts;
-                }
+                if (owner) { drawBallX = owner.x + 20; drawBallY = owner.y - 20; drawBallZ = 0; } 
             }
             if ((isInOG && drawBallY > 2000) || (!isInOG && drawBallY < 2000)) {
                 ctx.fillStyle = '#ff6600';
@@ -1172,10 +1339,15 @@
 
                 let playerHeldItem = null;
                 if (isMe) playerHeldItem = myHeldItem;
-                else { for(let i=1; i<=4; i++) if (gameState['sword'+i+'_owner'] === id) playerHeldItem = 'sword'; }
+                else { 
+                    for(let i=1; i<=4; i++) if (gameState['sword'+i+'_owner'] === id) playerHeldItem = 'sword'; 
+                    if (gameState.mg_owner === id) playerHeldItem = 'mg';
+                }
                 
                 if (playerHeldItem && playerHeldItem.startsWith('sword')) {
                     ctx.fillStyle = '#aaaaaa'; ctx.fillRect(px + 35, py - 5, 6, 30);
+                } else if (playerHeldItem === 'mg') {
+                    ctx.fillStyle = '#444'; ctx.fillRect(px + 10, py + 15, 30, 6);
                 }
 
                 if (isGabri && nowTime < localGabriSince + TAG_COOLDOWN_MS) {
@@ -1194,21 +1366,18 @@
 
             ctx.restore(); 
 
-            // UI LAYER: FESTE JOYSTICKS
             ctx.save();
             ctx.beginPath(); ctx.arc(joyBase.x, joyBase.y, joyBase.r, 0, Math.PI*2);
             ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
             ctx.beginPath(); ctx.arc(joystick.nx, joystick.ny, 25, 0, Math.PI*2);
             ctx.fillStyle = 'rgba(0, 255, 204, 0.4)'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 15; ctx.fill();
             
-            // Button A (Aktion)
             ctx.beginPath(); ctx.arc(btnA.x, btnA.y, btnA.r, 0, Math.PI*2);
             ctx.fillStyle = btnA.active ? 'rgba(255,51,102,0.6)' : 'rgba(255,51,102,0.2)'; 
             ctx.strokeStyle = 'rgba(255,51,102,0.4)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
             ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = 'bold 16px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText("A", btnA.x, btnA.y);
 
-            // Button B (Dash)
             ctx.beginPath(); ctx.arc(btnB.x, btnB.y, btnB.r, 0, Math.PI*2);
             ctx.fillStyle = btnB.active ? 'rgba(0,255,204,0.6)' : 'rgba(0,255,204,0.2)'; 
             ctx.strokeStyle = 'rgba(0,255,204,0.4)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
