@@ -41,7 +41,6 @@
             display: block;
             width: 100vw;
             height: 100vh;
-            /* Versteckt den Canvas, bis das Spiel läuft */
             opacity: 0; 
             transition: opacity 0.5s;
         }
@@ -76,7 +75,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #0d0d12; /* Dunkler Hintergrund in der Lobby */
+            background: #0d0d12; 
             z-index: 50;
             transition: opacity 0.3s ease;
         }
@@ -95,7 +94,7 @@
             color: white;
             text-shadow: 0 0 10px var(--primary);
             font-size: 24px;
-            margin-bottom: 10px; /* Leicht angepasst für Untertitel */
+            margin-bottom: 10px; 
             line-height: 1.4;
         }
 
@@ -175,11 +174,28 @@
         .rank-loser { background: rgba(255, 51, 102, 0.2); border: 1px solid var(--gabri); color: #ff99aa;}
         .rank-winner { background: rgba(0, 255, 204, 0.1); border: 1px solid var(--primary); color: var(--primary);}
 
+        /* Etagen-Anzeige */
+        #floorDisplay {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            text-shadow: 0 0 5px var(--primary);
+            pointer-events: none;
+            display: none;
+        }
+        .game-running #floorDisplay { display: block; }
     </style>
 </head>
 <body>
 
-    <!-- Dynamisches PWA Setup (Macht die Website zur App) -->
     <script>
         const manifestJSON = {
             name: "Gabri-Flucht",
@@ -206,6 +222,8 @@
 
     <canvas id="gameCanvas"></canvas>
 
+    <div id="floorDisplay">EG</div>
+
     <div id="ui-layer" style="display: none;">
         <div class="hud-header">
             <div class="glass-panel hud-box" id="hudTimerBox">
@@ -220,7 +238,6 @@
 
     <div id="screens-layer">
         
-        <!-- Screen 1: Login -->
         <div id="screen-login" class="screen glass-panel active">
             <h1>GABRI<br><span style="color:white; font-size: 16px;">FLUCHT</span></h1>
             <p class="text-gray-300 text-center mb-6 text-sm">
@@ -231,7 +248,6 @@
             <button id="btnJoin" class="btn-elite">WEITER</button>
         </div>
 
-        <!-- Screen 1.5: Server Room -->
         <div id="screen-room" class="screen glass-panel">
             <h2 class="text-2xl font-bold text-center text-white mb-2">SERVER RAUM</h2>
             <p class="text-gray-300 text-center mb-6 text-sm">Gib einen Code ein, um mit deinen Freunden zu spielen.</p>
@@ -239,7 +255,6 @@
             <button id="btnJoinRoom" class="btn-elite">RAUM BETRETEN</button>
         </div>
 
-        <!-- Screen 2: Lobby -->
         <div id="screen-lobby" class="screen glass-panel">
             <h2 id="lobbyTitle" class="text-2xl font-bold text-center text-primary mb-2">LOBBY</h2>
             <p class="text-center text-gray-400 text-sm mb-4">Warte auf Mitspieler... (Namen in der Liste)</p>
@@ -249,7 +264,6 @@
             <button id="btnStartGame" class="btn-elite">RUNDE STARTEN (3 MIN)</button>
         </div>
 
-        <!-- Screen 3: Leaderboard / Game Over -->
         <div id="screen-leaderboard" class="screen glass-panel">
             <h2 class="text-2xl font-bold text-center mb-1 text-white">RUNDE BEENDET</h2>
             <p class="text-center text-red-400 text-sm mb-6 font-semibold">Wer am längsten Gabri war, verliert!</p>
@@ -291,9 +305,10 @@
         }
 
         const GAME_DURATION_SEC = 180; // 3 Minuten
-        const MAP_WIDTH = 2000;
-        const MAP_HEIGHT = 2000;
-        const PLAYER_SIZE = 48;
+        const MAP_WIDTH = 2500;
+        // DOPPELTE HÖHE FÜR 2 ETAGEN (0-2000 ist EG, 2000-4000 ist OG)
+        const MAP_HEIGHT = 4000; 
+        const PLAYER_SIZE = 40;
         const BASE_SPEED = 300; 
         const TAG_COOLDOWN_MS = 2000;
 
@@ -310,6 +325,7 @@
         let localGabriSince = 0;
         let localTagCounter = 0;
         let lastHostTick = 0;
+        let lastStairTime = 0; // Cooldown für Treppen
 
         let myLocalPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
         let lastUpdateTime = performance.now();
@@ -318,45 +334,105 @@
 
         const screensLayer = document.getElementById('screens-layer');
         const uiLayer = document.getElementById('ui-layer');
+        const floorDisplay = document.getElementById('floorDisplay');
         const canvasElement = document.getElementById('gameCanvas');
         let camera = { x: 0, y: 0 };
 
-        const obstacles = [
-            { x: -50, y: -50, w: MAP_WIDTH+100, h: 50, color: '#1a1a24' },
-            { x: -50, y: MAP_HEIGHT, w: MAP_WIDTH+100, h: 50, color: '#1a1a24' },
-            { x: -50, y: -50, w: 50, h: MAP_HEIGHT+100, color: '#1a1a24' },
-            { x: MAP_WIDTH, y: -50, w: 50, h: MAP_HEIGHT+100, color: '#1a1a24' },
-            { x: 200, y: 200, w: 500, h: 300, color: '#1a1a24', glow: true, label: 'HAUPTGEBÄUDE' },
-            { x: 1200, y: 150, w: 600, h: 400, color: '#1a1a24', glow: true, label: 'TURNHALLE' },
-            { x: 300, y: 900, w: 400, h: 500, color: '#1a1a24', glow: true, label: 'MENSA' },
-            { x: 1100, y: 1100, w: 500, h: 300, color: '#1a1a24', glow: true, label: 'BIBLIOTHEK' },
-            { x: 850, y: 400, w: 100, h: 100, color: '#2a2a36' },
-            { x: 900, y: 700, w: 150, h: 80, color: '#2a2a36' },
-            { x: 950, y: 1500, w: 100, h: 100, color: '#2a2a36' },
-            { x: 1700, y: 700, w: 100, h: 250, color: '#2a2a36' }
-        ];
+        // --- MAP BUILDER ARCHITEKTUR ---
+        let obstacles = [];
+        let labels = [];
+        let stairs = [];
 
-        function mulberry32(a) {
-            return function() {
-              var t = a += 0x6D2B79F5;
-              t = Math.imul(t ^ t >>> 15, t | 1);
-              t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-              return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        // Begrenzungswände (Außen) EG
+        obstacles.push({x: -50, y: -50, w: MAP_WIDTH+100, h: 50, isWall: true});
+        obstacles.push({x: -50, y: -50, w: 50, h: 2000+100, isWall: true});
+        obstacles.push({x: MAP_WIDTH, y: -50, w: 50, h: 2000+100, isWall: true});
+        // Trennwand EG / OG (Unpassierbar ohne Treppen)
+        obstacles.push({x: -50, y: 1980, w: MAP_WIDTH+100, h: 40, isWall: true});
+        // Begrenzungswände (Außen) OG
+        obstacles.push({x: -50, y: MAP_HEIGHT, w: MAP_WIDTH+100, h: 50, isWall: true});
+        obstacles.push({x: -50, y: 2000, w: 50, h: 2000+100, isWall: true});
+        obstacles.push({x: MAP_WIDTH, y: 2000, w: 50, h: 2000+100, isWall: true});
+
+        // Funktion zum Erstellen eines Raumes mit Türen und Interieur
+        function buildRoom(rx, ry, rw, rh, doorEdge, doorOffset, doorWidth, labelText, isEmptyRoom=false) {
+            const wall = 20; // Wanddicke
+            
+            // Wände bauen (mit Lücken für Türen)
+            if (doorEdge === 'top') {
+                obstacles.push({x: rx, y: ry, w: doorOffset, h: wall, isWall: true});
+                obstacles.push({x: rx + doorOffset + doorWidth, y: ry, w: rw - doorOffset - doorWidth, h: wall, isWall: true});
+            } else { obstacles.push({x: rx, y: ry, w: rw, h: wall, isWall: true}); }
+
+            if (doorEdge === 'bottom') {
+                obstacles.push({x: rx, y: ry + rh - wall, w: doorOffset, h: wall, isWall: true});
+                obstacles.push({x: rx + doorOffset + doorWidth, y: ry + rh - wall, w: rw - doorOffset - doorWidth, h: wall, isWall: true});
+            } else { obstacles.push({x: rx, y: ry + rh - wall, w: rw, h: wall, isWall: true}); }
+
+            if (doorEdge === 'left') {
+                obstacles.push({x: rx, y: ry, w: wall, h: doorOffset, isWall: true});
+                obstacles.push({x: rx, y: ry + doorOffset + doorWidth, w: wall, h: rh - doorOffset - doorWidth, isWall: true});
+            } else { obstacles.push({x: rx, y: ry, w: wall, h: rh, isWall: true}); }
+
+            if (doorEdge === 'right') {
+                obstacles.push({x: rx + rw - wall, y: ry, w: wall, h: doorOffset, isWall: true});
+                obstacles.push({x: rx + rw - wall, y: ry + doorOffset + doorWidth, w: wall, h: rh - doorOffset - doorWidth, isWall: true});
+            } else { obstacles.push({x: rx + rw - wall, y: ry, w: wall, h: rh, isWall: true}); }
+
+            // Beschriftung in die Mitte des Raumes
+            if (labelText) labels.push({x: rx + rw/2, y: ry + rh/2, text: labelText});
+
+            // Tische und Stühle (Interieur) generieren
+            if (!isEmptyRoom) {
+                let cols = Math.floor((rw - wall*2) / 140);
+                let rows = Math.floor((rh - wall*2) / 140);
+                let padX = (rw - wall*2 - (cols * 140)) / 2;
+                let padY = (rh - wall*2 - (rows * 140)) / 2;
+                
+                for (let r=0; r<rows; r++) {
+                    for (let c=0; c<cols; c++) {
+                        let tx = rx + wall + padX + c*140 + 30;
+                        let ty = ry + wall + padY + r*140 + 30;
+                        
+                        // Tisch
+                        obstacles.push({x: tx, y: ty, w: 80, h: 40, isTable: true});
+                        // Stühle darum herum
+                        obstacles.push({x: tx + 10, y: ty - 25, w: 20, h: 20, isChair: true, dir: 'up'});
+                        obstacles.push({x: tx + 50, y: ty - 25, w: 20, h: 20, isChair: true, dir: 'up'});
+                        obstacles.push({x: tx + 10, y: ty + 45, w: 20, h: 20, isChair: true, dir: 'down'});
+                        obstacles.push({x: tx + 50, y: ty + 45, w: 20, h: 20, isChair: true, dir: 'down'});
+                    }
+                }
             }
         }
-        const prng = mulberry32(9999); 
-        for (let i = 0; i < 40; i++) {
-            let cx = prng() * (MAP_WIDTH - 100) + 50;
-            let cy = prng() * (MAP_HEIGHT - 100) + 50;
-            let isInside = obstacles.some(obs => cx < obs.x + obs.w && cx + 30 > obs.x && cy < obs.y + obs.h && cy + 30 > obs.y);
-            if (!isInside) { obstacles.push({ x: cx, y: cy, w: 30, h: 30, color: '#5c4033', isChair: true }); }
-        }
+
+        // --- ERDGESCHOSS (0 - 2000) ---
+        buildRoom(100, 100, 800, 500, 'right', 200, 120, 'MATHE (EG)');
+        buildRoom(1500, 100, 900, 500, 'left', 200, 120, 'BIOLOGIE (EG)');
+        buildRoom(100, 1300, 700, 600, 'top', 300, 150, 'MENSA (EG)');
+        buildRoom(1300, 1100, 1100, 800, 'left', 400, 200, 'TURNHALLE (EG)', true); // Turnhalle ist leer
+
+        // --- OBERGESCHOSS (2000 - 4000) ---
+        buildRoom(100, 2100, 800, 500, 'right', 200, 120, 'CHEMIE (OG)');
+        buildRoom(1500, 2100, 900, 500, 'left', 200, 120, 'PHYSIK (OG)');
+        buildRoom(100, 3300, 1000, 600, 'top', 400, 120, 'LEHRERZIMMER (OG)');
+        buildRoom(1500, 3300, 900, 600, 'top', 300, 120, 'BIBLIOTHEK (OG)');
+
+        // --- TREPPEN (Teleporter zwischen EG und OG) ---
+        // Treppe Links
+        stairs.push({ x: 1000, y: 300, w: 120, h: 160, targetY: 2300, label: 'ZUM OG' });
+        stairs.push({ x: 1000, y: 2300, w: 120, h: 160, targetY: 300, label: 'ZUM EG' });
+        // Treppe Unten Mitte
+        stairs.push({ x: 900, y: 1700, w: 160, h: 120, targetY: 3700, label: 'ZUM OG' });
+        stairs.push({ x: 900, y: 3700, w: 160, h: 120, targetY: 1700, label: 'ZUM EG' });
 
         const teachers = [
-            { startX: 750, startY: 300, moveX: 300, moveY: 0, speed: 0.001, name: "Herr Müller", currentX: 0, currentY: 0 },
-            { startX: 1000, startY: 800, moveX: 0, moveY: 400, speed: 0.0015, name: "Frau Schmidt", currentX: 0, currentY: 0 },
-            { startX: 400, startY: 1500, moveX: 400, moveY: -200, speed: 0.0008, name: "Herr Weber", currentX: 0, currentY: 0 },
-            { startX: 1500, startY: 800, moveX: -200, moveY: 0, speed: 0.002, name: "Direktor", currentX: 0, currentY: 0 }
+            // EG Lehrer
+            { startX: 1150, startY: 800, moveX: 0, moveY: 600, speed: 0.001, name: "Herr Müller (EG)", currentX: 0, currentY: 0 },
+            { startX: 200, startY: 800, moveX: 600, moveY: 0, speed: 0.0015, name: "Frau Schmidt (EG)", currentX: 0, currentY: 0 },
+            // OG Lehrer
+            { startX: 1150, startY: 2800, moveX: 0, moveY: 500, speed: 0.0012, name: "Herr Weber (OG)", currentX: 0, currentY: 0 },
+            { startX: 1500, startY: 2800, moveX: 500, moveY: 0, speed: 0.0018, name: "Direktor (OG)", currentX: 0, currentY: 0 }
         ];
 
         function createPixelSprite(type) {
@@ -396,7 +472,6 @@
         const texGabri = createPixelSprite('gabri');
         const texTeacher = createPixelSprite('teacher');
 
-        // --- SCHRITT 1: LOGIN (FEHLER BEHOBEN) ---
         document.getElementById('btnJoin').addEventListener('click', async () => {
             const name = document.getElementById('playerNameInput').value.trim();
             if (!name) return;
@@ -404,17 +479,14 @@
             
             const btn = document.getElementById('btnJoin');
             btn.innerText = "LÄDT...";
-            btn.disabled = true; // Verhindert mehrfaches Klicken
+            btn.disabled = true; 
             
             try {
-                // Versuche, dich bei Firebase anzumelden
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
-                
-                // Wenn wir hier ankommen, hat der Login geklappt (oder wir waren eh schon drin)
                 user = auth.currentUser;
                 
                 if (user) {
@@ -430,14 +502,12 @@
             }
         });
 
-        // Halte den User-Status im Hintergrund aktuell
         if (auth) {
             onAuthStateChanged(auth, (currentUser) => {
                 if (currentUser) user = currentUser;
             });
         }
 
-        // --- SCHRITT 2: RAUM BETRETEN ---
         document.getElementById('btnJoinRoom').addEventListener('click', () => {
             let code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
             if (!code) code = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -445,12 +515,18 @@
             currentRoomId = code;
             document.getElementById('lobbyTitle').innerText = "RAUM: " + currentRoomId;
 
+            // SICHERER SPAWN IM INNENHOF DES ERDGESCHOSSES (X=1150, Y=800)
+            myLocalPlayer.x = 1150 + Math.random()*100;
+            myLocalPlayer.y = 800 + Math.random()*100;
+            camera.x = myLocalPlayer.x - window.innerWidth/2;
+            camera.y = myLocalPlayer.y - window.innerHeight/2;
+
             const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
             setDoc(playerRef, { 
                 id: user.uid, 
                 name: myName, 
                 roomId: currentRoomId, 
-                x: 0, y: 0, 
+                x: myLocalPlayer.x, y: myLocalPlayer.y, 
                 timeAsGabri: 0, 
                 lastSeen: Date.now() 
             });
@@ -493,10 +569,8 @@
                         localGabriSince = Date.now();
                         localTagCounter = newState.tagCounter;
                         
-                        myLocalPlayer.x = Math.random() * (MAP_WIDTH - 200) + 100;
-                        myLocalPlayer.y = Math.random() * (MAP_HEIGHT - 200) + 100;
-                        camera.x = Math.max(0, Math.min(myLocalPlayer.x + PLAYER_SIZE/2 - canvasElement.width/2, MAP_WIDTH - canvasElement.width));
-                        camera.y = Math.max(0, Math.min(myLocalPlayer.y + PLAYER_SIZE/2 - canvasElement.height/2, MAP_HEIGHT - canvasElement.height));
+                        myLocalPlayer.x = 1150 + Math.random()*100;
+                        myLocalPlayer.y = 800 + Math.random()*100;
                     
                     } else if (newState.isPlaying && newState.tagCounter !== localTagCounter) {
                         localTagCounter = newState.tagCounter;
@@ -515,7 +589,6 @@
 
         document.getElementById('btnStartGame').addEventListener('click', async () => {
             if (!user || !currentRoomId) return;
-            
             try {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
                 const activeIds = Object.keys(serverPlayers);
@@ -560,11 +633,8 @@
                     const gName = serverPlayers[localCurrentGabri]?.name || "Jemand";
                     document.getElementById('roleDisplay').innerHTML = `<span style="color:var(--primary)">LAUF! ${gName} ist Gabri!</span>`;
                 }
-
             } else if (gameState.isPlaying && gameState.timeLeft <= 0) {
-                if (screensLayer.style.display === 'none') {
-                    showLeaderboard();
-                }
+                if (screensLayer.style.display === 'none') showLeaderboard();
                 document.body.classList.remove('game-running');
             } else {
                 switchScreen('screen-lobby');
@@ -588,14 +658,7 @@
                 count++;
                 const p = serverPlayers[id];
                 const isMe = id === user?.uid;
-                list.innerHTML += `
-                    <div class="player-item">
-                        <div class="flex items-center gap-3">
-                            <div class="status-dot"></div>
-                            <span class="font-semibold ${isMe ? 'text-primary' : 'text-white'}">${p.name} ${isMe ? '(Du)' : ''}</span>
-                        </div>
-                    </div>
-                `;
+                list.innerHTML += `<div class="player-item"><div class="flex items-center gap-3"><div class="status-dot"></div><span class="font-semibold ${isMe ? 'text-primary' : 'text-white'}">${p.name} ${isMe ? '(Du)' : ''}</span></div></div>`;
             }
             if(count === 0) list.innerHTML = '<p class="text-center text-gray-500 py-2">Nur du bist hier...</p>';
         }
@@ -613,11 +676,8 @@
         function showLeaderboard() {
             switchScreen('screen-leaderboard');
             uiLayer.style.display = 'none';
-            
             let results = [];
-            for (let id in serverPlayers) {
-                results.push({ name: serverPlayers[id].name, time: getTotalGabriTime(id), id: id });
-            }
+            for (let id in serverPlayers) results.push({ name: serverPlayers[id].name, time: getTotalGabriTime(id), id: id });
             results.sort((a, b) => b.time - a.time);
 
             const list = document.getElementById('leaderboardList');
@@ -633,7 +693,6 @@
             });
         }
 
-        // --- 8. INPUT HANDLING (Touch, Maus & Tastatur) ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
@@ -645,21 +704,17 @@
 
         document.body.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
 
-        // --- Tastatur Events ---
         window.addEventListener('keydown', (e) => {
             if (keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.key.toLowerCase())) {
-                keys[e.key] = true;
-                keys[e.key.toLowerCase()] = true; // Fallback für Capslock
+                keys[e.key] = true; keys[e.key.toLowerCase()] = true;
             }
         });
         window.addEventListener('keyup', (e) => {
             if (keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.key.toLowerCase())) {
-                keys[e.key] = false;
-                keys[e.key.toLowerCase()] = false;
+                keys[e.key] = false; keys[e.key.toLowerCase()] = false;
             }
         });
 
-        // --- Maus Events ---
         canvas.addEventListener('mousedown', (e) => {
             if(!joystick.active) {
                 joystick.active = true; joystick.id = 'mouse';
@@ -678,7 +733,6 @@
             if(joystick.id === 'mouse') { joystick.active = false; joystick.id = null; joystick.dx = 0; joystick.dy = 0; }
         });
 
-        // --- Touch Events ---
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             for(let touch of e.changedTouches) {
@@ -732,20 +786,14 @@
             if (keys.a || keys.ArrowLeft) kx -= 1;
             if (keys.d || keys.ArrowRight) kx += 1;
 
-            if (kx !== 0 && ky !== 0) {
-                const len = Math.hypot(kx, ky);
-                kx /= len; ky /= len;
-            }
+            if (kx !== 0 && ky !== 0) { const len = Math.hypot(kx, ky); kx /= len; ky /= len; }
 
-            // Joystick (Maus/Touch) hat Priorität, falls aktiv, ansonsten Tastatur
             return {
                 dx: joystick.active ? joystick.dx : kx,
                 dy: joystick.active ? joystick.dy : ky
             };
         }
 
-
-        // --- 9. GAME ENGINE ---
         function checkWall(nx, ny) {
             if (nx < 0 || ny < 0 || nx + PLAYER_SIZE > MAP_WIDTH || ny + PLAYER_SIZE > MAP_HEIGHT) return true;
             for (let obs of obstacles) {
@@ -755,6 +803,18 @@
                 if (nx < t.currentX + PLAYER_SIZE && nx + PLAYER_SIZE > t.currentX && ny < t.currentY + PLAYER_SIZE && ny + PLAYER_SIZE > t.currentY) return true;
             }
             return false;
+        }
+
+        function checkStairs(px, py, now) {
+            if (now - lastStairTime < 1000) return; // 1 Sekunde Cooldown
+            for (let s of stairs) {
+                if (px < s.x + s.w && px + PLAYER_SIZE > s.x && py < s.y + s.h && py + PLAYER_SIZE > s.y) {
+                    myLocalPlayer.y = s.targetY;
+                    lastStairTime = now;
+                    createParticles(myLocalPlayer.x, myLocalPlayer.y, '#00ffcc');
+                    break;
+                }
+            }
         }
 
         function createParticles(x, y, color) {
@@ -813,17 +873,33 @@
                     if (!checkWall(myLocalPlayer.x + mx, myLocalPlayer.y)) myLocalPlayer.x += mx;
                     if (!checkWall(myLocalPlayer.x, myLocalPlayer.y + my)) myLocalPlayer.y += my;
 
+                    // Treppen checken
+                    checkStairs(myLocalPlayer.x, myLocalPlayer.y, now);
+
+                    // Kamera Sanft nachziehen
                     const targetCamX = myLocalPlayer.x + PLAYER_SIZE/2 - canvas.width/2;
                     const targetCamY = myLocalPlayer.y + PLAYER_SIZE/2 - canvas.height/2;
                     camera.x += (targetCamX - camera.x) * 10 * dt;
-                    camera.y += (targetCamY - camera.y) * 10 * dt;
+                    
+                    // Bei Etagen-Wechsel springt die Kamera schneller!
+                    if (Math.abs(targetCamY - camera.y) > 1000) {
+                        camera.y = targetCamY; 
+                    } else {
+                        camera.y += (targetCamY - camera.y) * 10 * dt;
+                    }
+                    
                     camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width));
                     camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
 
                     for(let id in serverPlayers) {
                         if (id !== user.uid && gameEntities[id]) {
+                            // Wenn ein Spieler die Treppe nutzt (schneller Y-Sprung), sofort hinspringen lassen
+                            if (Math.abs(serverPlayers[id].y - gameEntities[id].y) > 1000) {
+                                gameEntities[id].y = serverPlayers[id].y;
+                            } else {
+                                gameEntities[id].y += (serverPlayers[id].y - gameEntities[id].y) * 15 * dt;
+                            }
                             gameEntities[id].x += (serverPlayers[id].x - gameEntities[id].x) * 15 * dt;
-                            gameEntities[id].y += (serverPlayers[id].y - gameEntities[id].y) * 15 * dt;
                         }
                     }
 
@@ -839,6 +915,9 @@
                     const sec = gameState.timeLeft % 60;
                     document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
                     document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(getTotalGabriTime(user.uid)/1000).toFixed(1)}s`;
+                    
+                    // Update Etagen-Anzeige (Y > 2000 ist OG)
+                    floorDisplay.innerText = myLocalPlayer.y > 2000 ? "OBERGESCHOSS (OG)" : "ERDGESCHOSS (EG)";
                 
                     render(dt, now);
                 }
@@ -854,12 +933,15 @@
                 t.currentY = t.startY + t.moveY * offset;
             });
 
-            ctx.fillStyle = '#0d0d12'; 
+            // Hintergrundfarbe ändert sich leicht je nach Etage für bessere Orientierung
+            const isInOG = camera.y > 1500;
+            ctx.fillStyle = isInOG ? '#0b111a' : '#0d0d12'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             ctx.save();
             ctx.translate(-camera.x, -camera.y);
 
+            // Gitterboden
             ctx.strokeStyle = 'rgba(255,255,255,0.03)';
             ctx.lineWidth = 2;
             const gridSize = 100;
@@ -870,25 +952,70 @@
             for(let y = startY; y < camera.y + canvas.height; y += gridSize) if(y >= 0 && y <= MAP_HEIGHT) { ctx.moveTo(0, y); ctx.lineTo(MAP_WIDTH, y); }
             ctx.stroke();
 
-            for(let obs of obstacles) {
-                ctx.fillStyle = obs.color;
-                if (obs.isChair) {
-                    ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-                    ctx.fillRect(obs.x + 2, obs.y + 2, obs.w - 4, obs.h - 4); 
-                    ctx.fillStyle = 'white'; ctx.font = '16px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText('🪑', obs.x + obs.w/2, obs.y + obs.h/2 + 2);
-                } else {
-                    ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-                    if(obs.glow) {
-                        ctx.strokeStyle = 'rgba(0, 255, 204, 0.3)'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
-                        ctx.strokeStyle = 'rgba(0, 255, 204, 0.1)'; ctx.lineWidth = 8; ctx.strokeRect(obs.x+4, obs.y+4, obs.w-8, obs.h-8);
-                    }
-                    if(obs.label) {
-                        ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.font = 'bold 30px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                        ctx.fillText(obs.label, obs.x + obs.w/2, obs.y + obs.h/2);
-                    }
+            // Treppen zeichnen (Auffällig)
+            for(let s of stairs) {
+                // Nur Treppen auf der aktuellen Etage zeichnen
+                if ((isInOG && s.y < 2000) || (!isInOG && s.y > 2000)) continue;
+                
+                ctx.fillStyle = '#222';
+                ctx.fillRect(s.x, s.y, s.w, s.h);
+                ctx.strokeStyle = '#ffcc00'; // Auffälliges Gelb für Treppen
+                ctx.lineWidth = 4;
+                ctx.strokeRect(s.x, s.y, s.w, s.h);
+                
+                ctx.beginPath();
+                for(let i=0; i<10; i++) {
+                    ctx.moveTo(s.x, s.y + (i * s.h/10));
+                    ctx.lineTo(s.x + s.w, s.y + (i * s.h/10));
                 }
+                ctx.stroke();
+                
+                ctx.fillStyle = '#ffcc00'; 
+                ctx.font = '14px "Press Start 2P"'; 
+                ctx.textAlign = 'center'; 
+                ctx.textBaseline = 'middle';
+                // Dunkler Hintergrund für den Text
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(s.x, s.y + s.h/2 - 15, s.w, 30);
+                ctx.fillStyle = '#ffcc00';
+                ctx.fillText(s.label, s.x + s.w/2, s.y + s.h/2);
+            }
+
+            // Hindernisse, Räume, Tische, Stühle
+            for(let obs of obstacles) {
+                // Viewport Culling: Zeichne nur das, was auf dem Bildschirm ist (+ Puffer)
+                if (obs.x + (obs.w||0) < camera.x - 200 || obs.x > camera.x + canvas.width + 200 ||
+                    obs.y + (obs.h||0) < camera.y - 200 || obs.y > camera.y + canvas.height + 200) continue;
+
+                if (obs.isWall) {
+                    ctx.fillStyle = '#1a1a24';
+                    ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                    ctx.strokeStyle = 'rgba(0, 255, 204, 0.4)'; 
+                    ctx.lineWidth = 2; 
+                    ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+                } else if (obs.isTable) {
+                    ctx.fillStyle = '#5D4037'; // Holztisch
+                    ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                    ctx.strokeStyle = '#3E2723';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(obs.x+1, obs.y+1, obs.w-2, obs.h-2);
+                } else if (obs.isChair) {
+                    ctx.fillStyle = '#4E342E'; // Stuhlfläche
+                    ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                    ctx.fillStyle = '#3E2723'; // Rückenlehne (dunkler)
+                    if (obs.dir === 'up') ctx.fillRect(obs.x, obs.y, obs.w, 5);
+                    else ctx.fillRect(obs.x, obs.y + obs.h - 5, obs.w, 5);
+                }
+            }
+
+            // Raum Beschriftungen
+            for(let l of labels) {
+                if (l.x < camera.x - 200 || l.x > camera.x + canvas.width + 200 || l.y < camera.y - 200 || l.y > camera.y + canvas.height + 200) continue;
+                ctx.fillStyle = 'rgba(255,255,255,0.1)'; 
+                ctx.font = 'bold 36px "Outfit"'; 
+                ctx.textAlign = 'center'; 
+                ctx.textBaseline = 'middle';
+                ctx.fillText(l.text, l.x, l.y);
             }
 
             for(let i=particles.length-1; i>=0; i--) {
@@ -899,6 +1026,9 @@
             }
 
             for(let t of teachers) {
+                // Lehrer nur zeichnen, wenn sie auf derselben Etage sind
+                if ((isInOG && t.currentY < 2000) || (!isInOG && t.currentY > 2000)) continue;
+
                 ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; ctx.imageSmoothingEnabled = false;
                 ctx.drawImage(texTeacher, t.currentX, t.currentY, PLAYER_SIZE, PLAYER_SIZE); ctx.shadowBlur = 0;
                 ctx.fillStyle = '#aaaaaa'; ctx.font = '600 12px "Outfit"'; ctx.textAlign = 'center';
@@ -914,6 +1044,9 @@
                 
                 let px = isMe ? myLocalPlayer.x : (gameEntities[id]?.x || sp.x);
                 let py = isMe ? myLocalPlayer.y : (gameEntities[id]?.y || sp.y);
+
+                // Andere Spieler nur zeichnen, wenn sie auf MEINER Etage sind (Y über oder unter 2000)
+                if (!isMe && ((isInOG && py < 2000) || (!isInOG && py > 2000))) continue;
 
                 if (isGabri) {
                     ctx.shadowColor = '#ff3366'; ctx.shadowBlur = 20 + Math.abs(Math.sin(nowTime * 0.005)) * 10;
