@@ -23,7 +23,6 @@
             -webkit-user-select: none;
             -webkit-touch-callout: none;
             font-family: 'Outfit', sans-serif;
-            /* Wichtig für Mobile: Verhindert Markieren und Neuladen beim Wischen */
             touch-action: none; 
         }
 
@@ -34,16 +33,22 @@
             height: 100%;
             background-color: #0d0d12;
             overflow: hidden;
-            position: fixed; /* iOS Bugfix für Scrollen */
+            position: fixed; 
         }
 
         canvas {
             display: block;
             width: 100vw;
             height: 100vh;
+            /* Versteckt den Canvas, bis das Spiel läuft */
+            opacity: 0; 
+            transition: opacity 0.5s;
         }
 
-        /* Glassmorphism UI Base */
+        .game-running canvas {
+            opacity: 1;
+        }
+
         .glass-panel {
             background: var(--glass-bg);
             backdrop-filter: blur(12px);
@@ -53,7 +58,6 @@
             border-radius: 16px;
         }
 
-        /* Fullscreen Overlays */
         #ui-layer {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -71,10 +75,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            /* Halbdurchsichtig, damit man die Spieler in der Lobby im Hintergrund rumlaufen sieht */
-            background: rgba(13, 13, 18, 0.5);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
+            background: #0d0d12; /* Dunkler Hintergrund in der Lobby, man sieht die Map NICHT */
             z-index: 50;
             transition: opacity 0.3s ease;
         }
@@ -87,7 +88,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Typografie & Inputs */
         h1 {
             font-family: 'Press Start 2P', cursive;
             text-align: center;
@@ -130,7 +130,6 @@
         
         .btn-danger { background: linear-gradient(135deg, #ff3366 0%, #cc0033 100%); color: white; }
 
-        /* HUD Elemente */
         .hud-header {
             display: flex;
             justify-content: space-between;
@@ -158,7 +157,6 @@
             to { box-shadow: 0 0 30px var(--gabri), inset 0 0 20px var(--gabri); border-color: transparent; }
         }
 
-        /* Player List Lobby */
         .player-list { max-height: 200px; overflow-y: auto; margin-bottom: 20px; pointer-events: auto; }
         .player-item {
             display: flex; align-items: center; justify-content: space-between;
@@ -167,7 +165,6 @@
         .player-item:last-child { border: none; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #00ffcc; box-shadow: 0 0 8px #00ffcc; }
 
-        /* Leaderboard */
         .rank-row {
             display: flex; justify-content: space-between; padding: 12px;
             background: rgba(255,255,255,0.05); margin-bottom: 8px; border-radius: 8px;
@@ -180,10 +177,8 @@
 </head>
 <body>
 
-    <!-- Spieloberfläche -->
     <canvas id="gameCanvas"></canvas>
 
-    <!-- Head-Up Display (HUD) während des Spiels -->
     <div id="ui-layer" style="display: none;">
         <div class="hud-header">
             <div class="glass-panel hud-box" id="hudTimerBox">
@@ -196,10 +191,7 @@
         </div>
     </div>
 
-    <!-- UI Overlays (Login, Lobby, Leaderboard) -->
     <div id="screens-layer">
-        
-        <!-- Screen 1: Login -->
         <div id="screen-login" class="screen glass-panel active">
             <h1>GABRI<br><span style="color:white; font-size: 16px;">FLUCHT</span></h1>
             <p class="text-gray-300 text-center mb-6 text-sm">Überlebe den Schulhof. Werde nicht zum Gabri.</p>
@@ -207,47 +199,36 @@
             <button id="btnJoin" class="btn-elite">SPIEL BEITRETEN</button>
         </div>
 
-        <!-- Screen 2: Lobby -->
         <div id="screen-lobby" class="screen glass-panel">
             <h2 class="text-2xl font-bold text-center text-white mb-2">LOBBY</h2>
-            <p class="text-center text-gray-400 text-sm mb-4">Warte auf Mitspieler... Du kannst dich schon bewegen!</p>
+            <p class="text-center text-gray-400 text-sm mb-4">Warte auf Mitspieler... (Namen in der Liste)</p>
             
-            <div class="glass-panel player-list p-2" id="lobbyPlayerList">
-                <!-- Spieler werden hier generiert -->
-            </div>
+            <div class="glass-panel player-list p-2" id="lobbyPlayerList"></div>
 
             <button id="btnStartGame" class="btn-elite">RUNDE STARTEN (3 MIN)</button>
         </div>
 
-        <!-- Screen 3: Leaderboard / Game Over -->
         <div id="screen-leaderboard" class="screen glass-panel">
             <h2 class="text-2xl font-bold text-center mb-1 text-white">RUNDE BEENDET</h2>
             <p class="text-center text-red-400 text-sm mb-6 font-semibold">Wer am längsten Gabri war, verliert!</p>
             
-            <div id="leaderboardList" class="mb-6 max-h-[250px] overflow-y-auto pointer-events-auto">
-                <!-- Ranks hier -->
-            </div>
+            <div id="leaderboardList" class="mb-6 max-h-[250px] overflow-y-auto pointer-events-auto"></div>
 
-            <button id="btnRestart" class="btn-elite btn-danger">NEUE RUNDE IN DER LOBBY</button>
+            <button id="btnRestart" class="btn-elite btn-danger">ZURÜCK ZUR LOBBY</button>
         </div>
-
     </div>
 
-    <!-- Firebase Logic & Game Engine -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- 1. FIREBASE SETUP ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-elite-game';
         
         let firebaseConfig;
-
         if (typeof __firebase_config !== 'undefined') {
             firebaseConfig = JSON.parse(__firebase_config);
         } else {
-            // Deine originalen Keys
             firebaseConfig = {
                 apiKey: "AIzaSyDWM2Dnq72MeWuZcV3uT4YXg0G9nyZIVAc",
                 authDomain: "gabri-4f94c.firebaseapp.com",
@@ -267,36 +248,36 @@
             console.error("Firebase konnte nicht geladen werden:", error);
         }
 
-        // --- 2. GAME CONFIGURATION ---
-        const GAME_DURATION_MS = 3 * 60 * 1000;
+        const GAME_DURATION_SEC = 180; // 3 Minuten in Sekunden
         const MAP_WIDTH = 2000;
         const MAP_HEIGHT = 2000;
         const PLAYER_SIZE = 48;
         const BASE_SPEED = 300; 
         const TAG_COOLDOWN_MS = 2000;
 
-        // --- 3. STATE MANAGEMENT ---
         let user = null;
         let myName = "Player";
         let serverPlayers = {}; 
         let gameEntities = {};  
-        let gameState = { isPlaying: false, endTime: 0, currentGabri: null, gabriSince: 0, lastTagTime: 0 };
+        let gameState = { isPlaying: false, timeLeft: 0, currentGabri: null, hostId: null, roundId: null, tagCounter: 0 };
         
+        // Lokale Statusvariablen für perfekte Synchronisation (immun gegen Uhrzeit-Fehler)
+        let currentRoundId = null;
+        let localCurrentGabri = null;
+        let localGabriSince = 0;
+        let localTagCounter = 0;
+        let lastHostTick = 0;
+
         let myLocalPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
-        
         let lastUpdateTime = performance.now();
         let lastSyncTime = 0;
         let particles = [];
 
-        // UI Referenzen
         const screensLayer = document.getElementById('screens-layer');
         const uiLayer = document.getElementById('ui-layer');
-        const screenLogin = document.getElementById('screen-login');
-        const screenLobby = document.getElementById('screen-lobby');
-        const screenLeaderboard = document.getElementById('screen-leaderboard');
-        const hudStatusBox = document.getElementById('hudStatusBox');
-        
-        // --- 4. MAP & OBSTACLES ---
+        const canvasElement = document.getElementById('gameCanvas');
+        let camera = { x: 0, y: 0 };
+
         const obstacles = [
             { x: -50, y: -50, w: MAP_WIDTH+100, h: 50, color: '#1a1a24' },
             { x: -50, y: MAP_HEIGHT, w: MAP_WIDTH+100, h: 50, color: '#1a1a24' },
@@ -321,14 +302,11 @@
             }
         }
         const prng = mulberry32(9999); 
-        
         for (let i = 0; i < 40; i++) {
             let cx = prng() * (MAP_WIDTH - 100) + 50;
             let cy = prng() * (MAP_HEIGHT - 100) + 50;
             let isInside = obstacles.some(obs => cx < obs.x + obs.w && cx + 30 > obs.x && cy < obs.y + obs.h && cy + 30 > obs.y);
-            if (!isInside) {
-                obstacles.push({ x: cx, y: cy, w: 30, h: 30, color: '#5c4033', isChair: true });
-            }
+            if (!isInside) { obstacles.push({ x: cx, y: cy, w: 30, h: 30, color: '#5c4033', isChair: true }); }
         }
 
         const teachers = [
@@ -338,45 +316,31 @@
             { startX: 1500, startY: 800, moveX: -200, moveY: 0, speed: 0.002, name: "Direktor", currentX: 0, currentY: 0 }
         ];
 
-        // --- 5. SPRITE GENERATOR ---
         function createPixelSprite(type) {
             const canvas = document.createElement('canvas');
-            const size = 12; 
-            canvas.width = size; canvas.height = size;
+            canvas.width = 12; canvas.height = 12;
             const ctx = canvas.getContext('2d');
             
             const isGabri = type === 'gabri';
             const isTeacher = type === 'teacher';
-
             const skin = isGabri ? '#ff99aa' : (isTeacher ? '#eebb99' : '#ffcba4');
             const shirt = isGabri ? '#ff3366' : (isTeacher ? '#555555' : '#00ffcc');
             const pants = '#1a1a24';
             const hair = isTeacher ? '#cccccc' : '#1a1a24';
 
             const layout = [
-                [0,0,0,0,6,6,6,6,0,0,0,0],
-                [0,0,0,6,2,2,2,2,6,0,0,0],
-                [0,0,6,2,0,2,2,0,2,6,0,0],
-                [0,0,6,2,2,2,2,2,2,6,0,0],
-                [0,0,0,6,2,2,2,2,6,0,0,0],
-                [0,0,3,3,3,3,3,3,3,3,0,0],
-                [0,3,3,3,3,3,3,3,3,3,3,0],
-                [0,3,3,3,3,3,3,3,3,3,3,0],
-                [0,3,0,4,4,4,4,4,4,0,3,0],
-                [0,0,0,4,4,0,0,4,4,0,0,0],
-                [0,0,5,5,0,0,0,0,5,5,0,0]
+                [0,0,0,0,6,6,6,6,0,0,0,0], [0,0,0,6,2,2,2,2,6,0,0,0], [0,0,6,2,0,2,2,0,2,6,0,0],
+                [0,0,6,2,2,2,2,2,2,6,0,0], [0,0,0,6,2,2,2,2,6,0,0,0], [0,0,3,3,3,3,3,3,3,3,0,0],
+                [0,3,3,3,3,3,3,3,3,3,3,0], [0,3,3,3,3,3,3,3,3,3,3,0], [0,3,0,4,4,4,4,4,4,0,3,0],
+                [0,0,0,4,4,0,0,4,4,0,0,0], [0,0,5,5,0,0,0,0,5,5,0,0]
             ];
-
             for(let y=0; y<11; y++) {
                 for(let x=0; x<12; x++) {
                     let p = layout[y][x];
                     if(p!==0){
                         switch(p){
-                            case 6: ctx.fillStyle = hair; break;
-                            case 1: ctx.fillStyle = pants; break; 
-                            case 2: ctx.fillStyle = skin; break;
-                            case 3: ctx.fillStyle = shirt; break;
-                            case 4: ctx.fillStyle = pants; break;
+                            case 6: ctx.fillStyle = hair; break; case 1: case 4: ctx.fillStyle = pants; break; 
+                            case 2: ctx.fillStyle = skin; break; case 3: ctx.fillStyle = shirt; break;
                             case 5: ctx.fillStyle = '#111'; break;
                         }
                         ctx.fillRect(x, y, 1, 1);
@@ -389,10 +353,6 @@
         const texGabri = createPixelSprite('gabri');
         const texTeacher = createPixelSprite('teacher');
 
-        // --- 6. AUTHENTICATION & START ---
-        const canvasElement = document.getElementById('gameCanvas');
-        let camera = { x: 0, y: 0 };
-
         const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -401,12 +361,7 @@
                     await signInAnonymously(auth);
                 }
             } catch (e) {
-                console.error("Auth failed:", e);
-                if (e.code === 'auth/operation-not-allowed') {
-                    alert("WICHTIG: Du musst in Firebase den Anbieter 'Anonym' aktivieren!");
-                } else {
-                    alert("Firebase Fehler: " + e.message);
-                }
+                alert("Firebase Fehler beim Login: " + e.message);
             }
         };
 
@@ -414,7 +369,6 @@
             const name = document.getElementById('playerNameInput').value.trim();
             if (!name) return;
             myName = name.substring(0, 12);
-            
             switchScreen('screen-lobby');
             await initAuth(); 
         });
@@ -423,35 +377,16 @@
             onAuthStateChanged(auth, (currentUser) => {
                 if (currentUser && myName !== "Player") {
                     user = currentUser;
-                    
-                    // --- BUGFIX: Initiale Position setzen UND Kamera SOFORT zentrieren ---
-                    myLocalPlayer.x = Math.random() * (MAP_WIDTH - 200) + 100;
-                    myLocalPlayer.y = Math.random() * (MAP_HEIGHT - 200) + 100;
-                    
-                    // Kamera direkt anspringen, damit man beim Starten nicht das Nichts sieht!
-                    camera.x = Math.max(0, Math.min(myLocalPlayer.x + PLAYER_SIZE/2 - canvasElement.width/2, MAP_WIDTH - canvasElement.width));
-                    camera.y = Math.max(0, Math.min(myLocalPlayer.y + PLAYER_SIZE/2 - canvasElement.height/2, MAP_HEIGHT - canvasElement.height));
-
                     const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
-                    setDoc(playerRef, {
-                        id: user.uid,
-                        name: myName,
-                        x: myLocalPlayer.x,
-                        y: myLocalPlayer.y,
-                        timeAsGabri: 0,
-                        lastSeen: Date.now()
-                    });
-
+                    setDoc(playerRef, { id: user.uid, name: myName, x: 0, y: 0, timeAsGabri: 0, lastSeen: Date.now() });
                     setupFirebaseListeners();
                     requestAnimationFrame(gameLoop);
                 }
             });
         }
 
-        // --- 7. FIREBASE SYNC ---
         function setupFirebaseListeners() {
             if (!user) return; 
-
             const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
             const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
 
@@ -461,12 +396,9 @@
                     const data = doc.data();
                     if (now - data.lastSeen < 10000) {
                         serverPlayers[doc.id] = data;
-                        if (!gameEntities[doc.id] && doc.id !== user.uid) {
-                            gameEntities[doc.id] = { x: data.x, y: data.y };
-                        }
+                        if (!gameEntities[doc.id] && doc.id !== user.uid) gameEntities[doc.id] = { x: data.x, y: data.y };
                     } else {
-                        delete serverPlayers[doc.id];
-                        delete gameEntities[doc.id];
+                        delete serverPlayers[doc.id]; delete gameEntities[doc.id];
                     }
                 });
                 updateLobbyUI();
@@ -474,31 +406,62 @@
 
             onSnapshot(stateRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    gameState = docSnap.data();
+                    const newState = docSnap.data();
+                    
+                    // Prüfen ob neue Runde gestartet wurde oder jemand getaggt wurde
+                    if (newState.isPlaying && newState.roundId !== currentRoundId) {
+                        currentRoundId = newState.roundId;
+                        localCurrentGabri = newState.currentGabri;
+                        localGabriSince = Date.now();
+                        localTagCounter = newState.tagCounter;
+                        
+                        // Setze mich auf zufällige Startposition
+                        myLocalPlayer.x = Math.random() * (MAP_WIDTH - 200) + 100;
+                        myLocalPlayer.y = Math.random() * (MAP_HEIGHT - 200) + 100;
+                        camera.x = Math.max(0, Math.min(myLocalPlayer.x + PLAYER_SIZE/2 - canvasElement.width/2, MAP_WIDTH - canvasElement.width));
+                        camera.y = Math.max(0, Math.min(myLocalPlayer.y + PLAYER_SIZE/2 - canvasElement.height/2, MAP_HEIGHT - canvasElement.height));
+                    
+                    } else if (newState.isPlaying && newState.tagCounter !== localTagCounter) {
+                        localTagCounter = newState.tagCounter;
+                        localCurrentGabri = newState.currentGabri;
+                        localGabriSince = Date.now();
+                    }
+
+                    gameState = newState;
                     handleStateChange();
                 }
             });
         }
 
+        // START BUTTON - Fehler-sicher gemacht
         document.getElementById('btnStartGame').addEventListener('click', async () => {
-            if (!user) return;
-            const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
+            if (!user) {
+                alert("Fehler: Du bist noch nicht mit dem Server verbunden. Bitte warte kurz.");
+                return;
+            }
             
-            const activeIds = Object.keys(serverPlayers);
-            if(activeIds.length === 0) activeIds.push(user.uid);
-            const randomGabri = activeIds[Math.floor(Math.random() * activeIds.length)];
+            try {
+                const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
+                const activeIds = Object.keys(serverPlayers);
+                if(activeIds.length === 0) activeIds.push(user.uid);
+                const randomGabri = activeIds[Math.floor(Math.random() * activeIds.length)];
 
-            await setDoc(stateRef, {
-                isPlaying: true,
-                endTime: Date.now() + GAME_DURATION_MS,
-                currentGabri: randomGabri,
-                gabriSince: Date.now(),
-                lastTagTime: Date.now()
-            });
+                // Host Timer-System: Der Host setzt das Spiel auf.
+                await setDoc(stateRef, {
+                    isPlaying: true,
+                    roundId: Math.random().toString(36).substring(2, 9),
+                    currentGabri: randomGabri,
+                    tagCounter: 0,
+                    hostId: user.uid,
+                    timeLeft: GAME_DURATION_SEC
+                });
 
-            for(let id of activeIds) {
-                const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', id);
-                updateDoc(pRef, { timeAsGabri: 0, lastSeen: Date.now() });
+                for(let id of activeIds) {
+                    const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', id);
+                    updateDoc(pRef, { timeAsGabri: 0, lastSeen: Date.now() });
+                }
+            } catch (error) {
+                alert("Konnte das Spiel nicht starten: " + error.message);
             }
         });
 
@@ -508,29 +471,32 @@
         });
 
         function handleStateChange() {
-            const now = Date.now();
-            
-            if (gameState.isPlaying && now < gameState.endTime) {
+            if (gameState.isPlaying && gameState.timeLeft > 0) {
                 // Spiel läuft
                 screensLayer.style.display = 'none';
                 uiLayer.style.display = 'flex';
+                document.body.classList.add('game-running'); // Zeigt Canvas
                 
-                if (gameState.currentGabri === user.uid) {
+                if (localCurrentGabri === user.uid) {
                     hudStatusBox.classList.add('is-gabri-alert');
                     document.getElementById('roleDisplay').innerText = "DU BIST GABRI! FANG SIE!";
                 } else {
                     hudStatusBox.classList.remove('is-gabri-alert');
-                    const gName = serverPlayers[gameState.currentGabri]?.name || "Jemand";
+                    const gName = serverPlayers[localCurrentGabri]?.name || "Jemand";
                     document.getElementById('roleDisplay').innerHTML = `<span style="color:var(--primary)">LAUF! ${gName} ist Gabri!</span>`;
                 }
 
-            } else if (gameState.isPlaying && now >= gameState.endTime) {
-                // Runde zu Ende
-                showLeaderboard();
+            } else if (gameState.isPlaying && gameState.timeLeft <= 0) {
+                // Spiel vorbei
+                if (screensLayer.style.display === 'none') {
+                    showLeaderboard();
+                }
+                document.body.classList.remove('game-running');
             } else {
-                // Zurück zur Lobby
+                // Zurück in der Lobby
                 switchScreen('screen-lobby');
                 uiLayer.style.display = 'none';
+                document.body.classList.remove('game-running');
             }
         }
 
@@ -565,8 +531,8 @@
             const p = serverPlayers[playerId];
             if (!p) return 0;
             let total = p.timeAsGabri || 0;
-            if (gameState.isPlaying && gameState.currentGabri === playerId && Date.now() < gameState.endTime) {
-                total += (Date.now() - gameState.gabriSince);
+            if (gameState.isPlaying && gameState.timeLeft > 0 && localCurrentGabri === playerId) {
+                total += (Date.now() - localGabriSince);
             }
             return total;
         }
@@ -579,63 +545,38 @@
             for (let id in serverPlayers) {
                 results.push({ name: serverPlayers[id].name, time: getTotalGabriTime(id), id: id });
             }
-            
             results.sort((a, b) => b.time - a.time);
 
             const list = document.getElementById('leaderboardList');
             list.innerHTML = '';
-            
             results.forEach((r, index) => {
                 let rowClass = "rank-row";
                 let medal = "";
-                if (index === 0) {
-                    rowClass += " rank-loser";
-                    medal = "💀 VERLIERER";
-                } else if (index === results.length - 1 && results.length > 1) {
-                    rowClass += " rank-winner";
-                    medal = "👑 GEWINNER";
-                }
+                if (index === 0) { rowClass += " rank-loser"; medal = "💀 VERLIERER"; } 
+                else if (index === results.length - 1 && results.length > 1) { rowClass += " rank-winner"; medal = "👑 GEWINNER"; }
 
                 const timeSec = (r.time / 1000).toFixed(1);
-                list.innerHTML += `
-                    <div class="${rowClass}">
-                        <span>${index + 1}. ${r.name} <span class="text-xs ml-2 opacity-80">${medal}</span></span>
-                        <span>${timeSec}s</span>
-                    </div>
-                `;
+                list.innerHTML += `<div class="${rowClass}"><span>${index + 1}. ${r.name} <span class="text-xs ml-2 opacity-80">${medal}</span></span><span>${timeSec}s</span></div>`;
             });
         }
 
-        // --- 8. INPUT HANDLING (Mobile/Touch Optimization) ---
+        // --- 8. INPUT HANDLING (Virtual Joystick) ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        
         let joystick = { active: false, id: null, cx: 0, cy: 0, nx: 0, ny: 0, dx: 0, dy: 0, maxRadius: 60 };
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            // Wenn Resized wird, springt Kamera sanft wieder auf den Spieler
-        }
-        window.addEventListener('resize', resize);
-        resize();
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-        // Verhindern von Standard-Wischgesten auf Handys (Samsung/iOS)
-        document.body.addEventListener('touchmove', function(e) {
-            e.preventDefault(); 
-        }, { passive: false });
+        document.body.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
 
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             for(let touch of e.changedTouches) {
-                // Joystick kann überall gestartet werden, wo nicht UI blockiert
                 if(!joystick.active) { 
-                    joystick.active = true;
-                    joystick.id = touch.identifier;
-                    joystick.cx = touch.clientX;
-                    joystick.cy = touch.clientY;
-                    joystick.nx = touch.clientX;
-                    joystick.ny = touch.clientY;
+                    joystick.active = true; joystick.id = touch.identifier;
+                    joystick.cx = touch.clientX; joystick.cy = touch.clientY;
+                    joystick.nx = touch.clientX; joystick.ny = touch.clientY;
                     updateJoy();
                 }
             }
@@ -646,9 +587,7 @@
             if(!joystick.active) return;
             for(let touch of e.changedTouches) {
                 if(touch.identifier === joystick.id) {
-                    joystick.nx = touch.clientX;
-                    joystick.ny = touch.clientY;
-                    
+                    joystick.nx = touch.clientX; joystick.ny = touch.clientY;
                     const dist = Math.hypot(joystick.nx - joystick.cx, joystick.ny - joystick.cy);
                     if (dist > joystick.maxRadius) {
                         const angle = Math.atan2(joystick.ny - joystick.cy, joystick.nx - joystick.cx);
@@ -663,84 +602,57 @@
         function endJoy(e) {
             e.preventDefault();
             for(let touch of e.changedTouches) {
-                if(touch.identifier === joystick.id) {
-                    joystick.active = false;
-                    joystick.id = null;
-                    joystick.dx = 0; joystick.dy = 0;
-                }
+                if(touch.identifier === joystick.id) { joystick.active = false; joystick.id = null; joystick.dx = 0; joystick.dy = 0; }
             }
         }
         canvas.addEventListener('touchend', endJoy, {passive: false});
         canvas.addEventListener('touchcancel', endJoy, {passive: false});
 
         function updateJoy() {
-            let dx = joystick.nx - joystick.cx;
-            let dy = joystick.ny - joystick.cy;
+            let dx = joystick.nx - joystick.cx; let dy = joystick.ny - joystick.cy;
             const dist = Math.hypot(dx, dy);
-            if (dist > 5) {
-                joystick.dx = dx / joystick.maxRadius;
-                joystick.dy = dy / joystick.maxRadius;
-            } else {
-                joystick.dx = 0; joystick.dy = 0;
-            }
+            if (dist > 5) { joystick.dx = dx / joystick.maxRadius; joystick.dy = dy / joystick.maxRadius; } 
+            else { joystick.dx = 0; joystick.dy = 0; }
         }
 
         // --- 9. GAME ENGINE ---
         function checkWall(nx, ny) {
             if (nx < 0 || ny < 0 || nx + PLAYER_SIZE > MAP_WIDTH || ny + PLAYER_SIZE > MAP_HEIGHT) return true;
-            
             for (let obs of obstacles) {
-                if (nx < obs.x + obs.w && nx + PLAYER_SIZE > obs.x &&
-                    ny < obs.y + obs.h && ny + PLAYER_SIZE > obs.y) {
-                    return true;
-                }
+                if (nx < obs.x + obs.w && nx + PLAYER_SIZE > obs.x && ny < obs.y + obs.h && ny + PLAYER_SIZE > obs.y) return true;
             }
-            
             for (let t of teachers) {
-                if (nx < t.currentX + PLAYER_SIZE && nx + PLAYER_SIZE > t.currentX &&
-                    ny < t.currentY + PLAYER_SIZE && ny + PLAYER_SIZE > t.currentY) {
-                    return true;
-                }
+                if (nx < t.currentX + PLAYER_SIZE && nx + PLAYER_SIZE > t.currentX && ny < t.currentY + PLAYER_SIZE && ny + PLAYER_SIZE > t.currentY) return true;
             }
             return false;
         }
 
         function createParticles(x, y, color) {
-            for(let i=0; i<15; i++) {
-                particles.push({
-                    x: x + PLAYER_SIZE/2, y: y + PLAYER_SIZE/2,
-                    vx: (Math.random() - 0.5) * 400, vy: (Math.random() - 0.5) * 400,
-                    life: 1.0, color: color
-                });
-            }
+            for(let i=0; i<15; i++) particles.push({ x: x + PLAYER_SIZE/2, y: y + PLAYER_SIZE/2, vx: (Math.random() - 0.5) * 400, vy: (Math.random() - 0.5) * 400, life: 1.0, color: color });
         }
 
         async function checkTags() {
-            if (!user || !gameState.isPlaying || gameState.currentGabri !== user.uid) return;
+            if (!user || !gameState.isPlaying || localCurrentGabri !== user.uid) return;
             const now = Date.now();
-            if (now < gameState.lastTagTime + TAG_COOLDOWN_MS) return;
+            if (now < localGabriSince + TAG_COOLDOWN_MS) return;
 
             for (let id in serverPlayers) {
                 if (id === user.uid) continue;
                 const p = gameEntities[id] || serverPlayers[id];
-                
-                const cx1 = myLocalPlayer.x + PLAYER_SIZE/2;
-                const cy1 = myLocalPlayer.y + PLAYER_SIZE/2;
-                const cx2 = p.x + PLAYER_SIZE/2;
-                const cy2 = p.y + PLAYER_SIZE/2;
+                const cx1 = myLocalPlayer.x + PLAYER_SIZE/2; const cy1 = myLocalPlayer.y + PLAYER_SIZE/2;
+                const cx2 = p.x + PLAYER_SIZE/2; const cy2 = p.y + PLAYER_SIZE/2;
                 const dist = Math.hypot(cx2 - cx1, cy2 - cy1);
 
                 if (dist < PLAYER_SIZE * 0.9) { 
                     createParticles(p.x, p.y, '#ff3366'); 
-                    
-                    const timeGained = now - gameState.gabriSince;
+                    const timeGained = now - localGabriSince;
                     const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
                     const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
                     
                     try {
                         Promise.all([
                             updateDoc(myRef, { timeAsGabri: increment(timeGained) }),
-                            updateDoc(stateRef, { currentGabri: id, gabriSince: now, lastTagTime: now })
+                            updateDoc(stateRef, { currentGabri: id, tagCounter: increment(1) })
                         ]);
                     } catch(e) { console.error(e); }
                     break;
@@ -754,72 +666,67 @@
             const now = Date.now();
 
             if (user) {
-                // BUGFIX & NEUES FEATURE: 
-                // Bewegung, Kamera-Follow & Server-Sync passieren IMMER!
-                // Auch in der Lobby! (Man kann schon mal herumlaufen)
-
-                // 1. Lokale Physik updaten
-                let mx = joystick.dx * BASE_SPEED * dt;
-                let my = joystick.dy * BASE_SPEED * dt;
-
-                if (!checkWall(myLocalPlayer.x + mx, myLocalPlayer.y)) myLocalPlayer.x += mx;
-                if (!checkWall(myLocalPlayer.x, myLocalPlayer.y + my)) myLocalPlayer.y += my;
-
-                // 2. Kamera Update (Smooth Follow)
-                const targetCamX = myLocalPlayer.x + PLAYER_SIZE/2 - canvas.width/2;
-                const targetCamY = myLocalPlayer.y + PLAYER_SIZE/2 - canvas.height/2;
-                camera.x += (targetCamX - camera.x) * 10 * dt;
-                camera.y += (targetCamY - camera.y) * 10 * dt;
-
-                camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width));
-                camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
-
-                // 3. Andere Spieler Interpolieren
-                for(let id in serverPlayers) {
-                    if (id !== user.uid && gameEntities[id]) {
-                        const targetX = serverPlayers[id].x;
-                        const targetY = serverPlayers[id].y;
-                        gameEntities[id].x += (targetX - gameEntities[id].x) * 15 * dt;
-                        gameEntities[id].y += (targetY - gameEntities[id].y) * 15 * dt;
+                // Host-Zentral-Timer tickt runter
+                if (gameState.isPlaying && gameState.hostId === user.uid && gameState.timeLeft > 0) {
+                    if (now - lastHostTick > 1000) {
+                        lastHostTick = now;
+                        const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
+                        updateDoc(stateRef, { timeLeft: gameState.timeLeft - 1 }).catch(()=>{});
                     }
                 }
 
-                // 4. Server Sync
-                if (now - lastSyncTime > 100) { 
-                    lastSyncTime = now;
-                    const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
-                    updateDoc(myRef, {
-                        x: Math.round(myLocalPlayer.x),
-                        y: Math.round(myLocalPlayer.y),
-                        lastSeen: now
-                    }).catch(()=>{});
-                }
+                // Spiellogik NUR, wenn das Spiel aktiv ist und das UI Layer unsichtbar ist
+                if (gameState.isPlaying && gameState.timeLeft > 0 && screensLayer.style.display === 'none') {
+                    
+                    let mx = joystick.dx * BASE_SPEED * dt;
+                    let my = joystick.dy * BASE_SPEED * dt;
 
-                // 5. Spiel Logik (NUR WENN SPIEL LÄUFT)
-                if (gameState.isPlaying && screensLayer.style.display === 'none') {
+                    if (!checkWall(myLocalPlayer.x + mx, myLocalPlayer.y)) myLocalPlayer.x += mx;
+                    if (!checkWall(myLocalPlayer.x, myLocalPlayer.y + my)) myLocalPlayer.y += my;
+
+                    const targetCamX = myLocalPlayer.x + PLAYER_SIZE/2 - canvas.width/2;
+                    const targetCamY = myLocalPlayer.y + PLAYER_SIZE/2 - canvas.height/2;
+                    camera.x += (targetCamX - camera.x) * 10 * dt;
+                    camera.y += (targetCamY - camera.y) * 10 * dt;
+                    camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width));
+                    camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
+
+                    for(let id in serverPlayers) {
+                        if (id !== user.uid && gameEntities[id]) {
+                            gameEntities[id].x += (serverPlayers[id].x - gameEntities[id].x) * 15 * dt;
+                            gameEntities[id].y += (serverPlayers[id].y - gameEntities[id].y) * 15 * dt;
+                        }
+                    }
+
+                    if (now - lastSyncTime > 100) { 
+                        lastSyncTime = now;
+                        const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+                        updateDoc(myRef, { x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y), lastSeen: now }).catch(()=>{});
+                    }
+
                     checkTags();
 
-                    const left = Math.max(0, gameState.endTime - now);
-                    const min = Math.floor(left / 60000);
-                    const sec = Math.floor((left % 60000) / 1000);
+                    const min = Math.floor(gameState.timeLeft / 60);
+                    const sec = gameState.timeLeft % 60;
                     document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
                     document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(getTotalGabriTime(user.uid)/1000).toFixed(1)}s`;
+                
+                    // Render Graphics
+                    render(dt, now);
                 }
             }
 
-            // Lehrer aktualisieren (immer, auch in Lobby)
+            requestAnimationFrame(gameLoop);
+        }
+
+        function render(dt, nowTime) {
+            // NPC Lehrer animieren (werden nur im Rendering bewegt)
             teachers.forEach(t => {
-                const time = now * t.speed;
-                const offset = Math.sin(time);
+                const offset = Math.sin(nowTime * t.speed);
                 t.currentX = t.startX + t.moveX * offset;
                 t.currentY = t.startY + t.moveY * offset;
             });
 
-            render(dt);
-            requestAnimationFrame(gameLoop);
-        }
-
-        function render(dt) {
             ctx.fillStyle = '#0d0d12'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -831,47 +738,27 @@
             const gridSize = 100;
             const startX = Math.floor(camera.x / gridSize) * gridSize;
             const startY = Math.floor(camera.y / gridSize) * gridSize;
-            
             ctx.beginPath();
-            for(let x = startX; x < camera.x + canvas.width; x += gridSize) {
-                if(x >= 0 && x <= MAP_WIDTH) { ctx.moveTo(x, 0); ctx.lineTo(x, MAP_HEIGHT); }
-            }
-            for(let y = startY; y < camera.y + canvas.height; y += gridSize) {
-                if(y >= 0 && y <= MAP_HEIGHT) { ctx.moveTo(0, y); ctx.lineTo(MAP_WIDTH, y); }
-            }
+            for(let x = startX; x < camera.x + canvas.width; x += gridSize) if(x >= 0 && x <= MAP_WIDTH) { ctx.moveTo(x, 0); ctx.lineTo(x, MAP_HEIGHT); }
+            for(let y = startY; y < camera.y + canvas.height; y += gridSize) if(y >= 0 && y <= MAP_HEIGHT) { ctx.moveTo(0, y); ctx.lineTo(MAP_WIDTH, y); }
             ctx.stroke();
 
             for(let obs of obstacles) {
                 ctx.fillStyle = obs.color;
-                
                 if (obs.isChair) {
                     ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
                     ctx.fillStyle = 'rgba(0,0,0,0.5)';
                     ctx.fillRect(obs.x + 2, obs.y + 2, obs.w - 4, obs.h - 4); 
-                    
-                    ctx.fillStyle = 'white';
-                    ctx.font = '16px "Outfit"';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = 'white'; ctx.font = '16px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.fillText('🪑', obs.x + obs.w/2, obs.y + obs.h/2 + 2);
                 } else {
                     ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-                    
                     if(obs.glow) {
-                        ctx.strokeStyle = 'rgba(0, 255, 204, 0.3)';
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
-                        
-                        ctx.strokeStyle = 'rgba(0, 255, 204, 0.1)';
-                        ctx.lineWidth = 8;
-                        ctx.strokeRect(obs.x+4, obs.y+4, obs.w-8, obs.h-8);
+                        ctx.strokeStyle = 'rgba(0, 255, 204, 0.3)'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+                        ctx.strokeStyle = 'rgba(0, 255, 204, 0.1)'; ctx.lineWidth = 8; ctx.strokeRect(obs.x+4, obs.y+4, obs.w-8, obs.h-8);
                     }
-
                     if(obs.label) {
-                        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-                        ctx.font = 'bold 30px "Outfit"';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.font = 'bold 30px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                         ctx.fillText(obs.label, obs.x + obs.w/2, obs.y + obs.h/2);
                     }
                 }
@@ -879,75 +766,50 @@
 
             for(let i=particles.length-1; i>=0; i--) {
                 let p = particles[i];
-                p.x += p.vx * dt;
-                p.y += p.vy * dt;
-                p.life -= dt * 2;
-                if(p.life <= 0) {
-                    particles.splice(i, 1);
-                    continue;
-                }
-                ctx.fillStyle = p.color;
-                ctx.globalAlpha = p.life;
-                ctx.fillRect(p.x, p.y, 8, 8);
-                ctx.globalAlpha = 1.0;
+                p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 2;
+                if(p.life <= 0) { particles.splice(i, 1); continue; }
+                ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 8, 8); ctx.globalAlpha = 1.0;
             }
 
             for(let t of teachers) {
-                ctx.shadowColor = 'rgba(0,0,0,0.5)';
-                ctx.shadowBlur = 10;
-                ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(texTeacher, t.currentX, t.currentY, PLAYER_SIZE, PLAYER_SIZE);
-                ctx.shadowBlur = 0;
-
-                ctx.fillStyle = '#aaaaaa';
-                ctx.font = '600 12px "Outfit"';
-                ctx.textAlign = 'center';
+                ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(texTeacher, t.currentX, t.currentY, PLAYER_SIZE, PLAYER_SIZE); ctx.shadowBlur = 0;
+                ctx.fillStyle = '#aaaaaa'; ctx.font = '600 12px "Outfit"'; ctx.textAlign = 'center';
                 const textWidth = ctx.measureText(t.name).width;
-                ctx.fillStyle = 'rgba(0,0,0,0.6)';
-                ctx.fillRect(t.currentX + PLAYER_SIZE/2 - textWidth/2 - 4, t.currentY - 24, textWidth + 8, 18);
-                ctx.fillStyle = '#cccccc';
-                ctx.fillText(t.name, t.currentX + PLAYER_SIZE/2, t.currentY - 10);
+                ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(t.currentX + PLAYER_SIZE/2 - textWidth/2 - 4, t.currentY - 24, textWidth + 8, 18);
+                ctx.fillStyle = '#cccccc'; ctx.fillText(t.name, t.currentX + PLAYER_SIZE/2, t.currentY - 10);
             }
 
-            const nowTime = Date.now();
             for(let id in serverPlayers) {
                 const sp = serverPlayers[id];
                 const isMe = (id === user?.uid);
-                const isGabri = (id === gameState.currentGabri);
+                const isGabri = (id === localCurrentGabri);
                 
                 let px = isMe ? myLocalPlayer.x : (gameEntities[id]?.x || sp.x);
                 let py = isMe ? myLocalPlayer.y : (gameEntities[id]?.y || sp.y);
 
-                if (isGabri && gameState.isPlaying) {
-                    const pulse = Math.abs(Math.sin(nowTime * 0.005)) * 10;
-                    ctx.shadowColor = '#ff3366';
-                    ctx.shadowBlur = 20 + pulse;
+                if (isGabri) {
+                    ctx.shadowColor = '#ff3366'; ctx.shadowBlur = 20 + Math.abs(Math.sin(nowTime * 0.005)) * 10;
                 } else {
-                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10;
                 }
 
                 ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(isGabri && gameState.isPlaying ? texGabri : texNormal, px, py, PLAYER_SIZE, PLAYER_SIZE);
+                ctx.drawImage(isGabri ? texGabri : texNormal, px, py, PLAYER_SIZE, PLAYER_SIZE);
                 ctx.shadowBlur = 0; 
 
-                if (isGabri && gameState.isPlaying && nowTime < gameState.lastTagTime + TAG_COOLDOWN_MS) {
-                    const progress = (nowTime - gameState.lastTagTime) / TAG_COOLDOWN_MS;
-                    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
+                if (isGabri && nowTime < localGabriSince + TAG_COOLDOWN_MS) {
+                    const progress = (nowTime - localGabriSince) / TAG_COOLDOWN_MS;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 3; ctx.beginPath();
                     ctx.arc(px + PLAYER_SIZE/2, py + PLAYER_SIZE/2, PLAYER_SIZE*0.8, -Math.PI/2, (-Math.PI/2) + (Math.PI*2*progress));
                     ctx.stroke();
                 }
 
-                ctx.fillStyle = (isGabri && gameState.isPlaying) ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
-                ctx.font = '600 14px "Outfit"';
-                ctx.textAlign = 'center';
+                ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
+                ctx.font = '600 14px "Outfit"'; ctx.textAlign = 'center';
                 const textWidth = ctx.measureText(sp.name).width;
-                ctx.fillStyle = 'rgba(0,0,0,0.6)';
-                ctx.fillRect(px + PLAYER_SIZE/2 - textWidth/2 - 4, py - 24, textWidth + 8, 18);
-                
-                ctx.fillStyle = (isGabri && gameState.isPlaying) ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
+                ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(px + PLAYER_SIZE/2 - textWidth/2 - 4, py - 24, textWidth + 8, 18);
+                ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
                 ctx.fillText(sp.name, px + PLAYER_SIZE/2, py - 10);
             }
 
@@ -955,20 +817,10 @@
 
             if (joystick.active) {
                 ctx.save();
-                ctx.beginPath();
-                ctx.arc(joystick.cx, joystick.cy, joystick.maxRadius, 0, Math.PI*2);
-                ctx.fillStyle = 'rgba(255,255,255,0.05)';
-                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-                ctx.lineWidth = 2;
-                ctx.fill();
-                ctx.stroke();
-
-                ctx.beginPath();
-                ctx.arc(joystick.nx, joystick.ny, 25, 0, Math.PI*2);
-                ctx.fillStyle = 'rgba(0, 255, 204, 0.4)';
-                ctx.shadowColor = '#00ffcc';
-                ctx.shadowBlur = 15;
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(joystick.cx, joystick.cy, joystick.maxRadius, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
+                ctx.beginPath(); ctx.arc(joystick.nx, joystick.ny, 25, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(0, 255, 204, 0.4)'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 15; ctx.fill();
                 ctx.restore();
             }
         }
