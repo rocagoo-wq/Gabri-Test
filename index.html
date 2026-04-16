@@ -6,6 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0d0d12">
     <title>Gabri-Flucht - Elite Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Press+Start+2P&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -94,7 +95,7 @@
             color: white;
             text-shadow: 0 0 10px var(--primary);
             font-size: 24px;
-            margin-bottom: 30px;
+            margin-bottom: 10px; /* Leicht angepasst für Untertitel */
             line-height: 1.4;
         }
 
@@ -177,6 +178,32 @@
 </head>
 <body>
 
+    <!-- Dynamisches PWA Setup (Macht die Website zur App) -->
+    <script>
+        const manifestJSON = {
+            name: "Gabri-Flucht",
+            short_name: "Gabri",
+            start_url: location.href,
+            display: "fullscreen",
+            background_color: "#0d0d12",
+            theme_color: "#00ffcc",
+            icons: [{
+                // Ein einfaches SVG als App-Icon, dynamisch eingebettet
+                src: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzBkMGQxMiIvPjx0ZXh0IHg9IjUwIiB5PSI2NCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2xkIiBmb250LXNpemU9IjUwIiBmaWxsPSIjMDBmZmNjIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5HPC90ZXh0Pjwvc3ZnPg==",
+                sizes: "512x512",
+                type: "image/svg+xml"
+            }]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifestJSON)], {type: "application/json"});
+        document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${URL.createObjectURL(manifestBlob)}">`);
+
+        if ('serviceWorker' in navigator) {
+            const swCode = `self.addEventListener('fetch', e => {});`;
+            const swBlob = new Blob([swCode], {type: "application/javascript"});
+            navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+        }
+    </script>
+
     <canvas id="gameCanvas"></canvas>
 
     <div id="ui-layer" style="display: none;">
@@ -196,7 +223,10 @@
         <!-- Screen 1: Login -->
         <div id="screen-login" class="screen glass-panel active">
             <h1>GABRI<br><span style="color:white; font-size: 16px;">FLUCHT</span></h1>
-            <p class="text-gray-300 text-center mb-6 text-sm">Überlebe den Schulhof. Werde nicht zum Gabri.</p>
+            <p class="text-gray-300 text-center mb-6 text-sm">
+                Überlebe den Schulhof.<br>
+                <span class="text-xs text-primary">(Steuerung per Touch, Maus oder WASD/Pfeiltasten)</span>
+            </p>
             <input type="text" id="playerNameInput" class="input-elite" placeholder="Dein Name" maxlength="12" autocomplete="off">
             <button id="btnJoin" class="btn-elite">WEITER</button>
         </div>
@@ -269,7 +299,7 @@
 
         let user = null;
         let myName = "Player";
-        let currentRoomId = null; // NEU: Der Server Raum
+        let currentRoomId = null; 
         
         let serverPlayers = {}; 
         let gameEntities = {};  
@@ -380,7 +410,6 @@
             }
         };
 
-        // SCHRITT 1: Name eingeben -> Wechselt zum Raum-Menü
         document.getElementById('btnJoin').addEventListener('click', async () => {
             const name = document.getElementById('playerNameInput').value.trim();
             if (!name) return;
@@ -393,20 +422,18 @@
             onAuthStateChanged(auth, (currentUser) => {
                 if (currentUser && myName !== "Player") {
                     user = currentUser;
-                    switchScreen('screen-room'); // Wechsel zum neuen Raum-Fenster
+                    switchScreen('screen-room');
                 }
             });
         }
 
-        // SCHRITT 2: Raum beitreten -> Lobby
         document.getElementById('btnJoinRoom').addEventListener('click', () => {
             let code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-            if (!code) code = Math.random().toString(36).substring(2, 6).toUpperCase(); // Zufälliger Code, falls leer
+            if (!code) code = Math.random().toString(36).substring(2, 6).toUpperCase();
             
             currentRoomId = code;
             document.getElementById('lobbyTitle').innerText = "RAUM: " + currentRoomId;
 
-            // Spieler in die Datenbank einschreiben (MIT RAUM-ID)
             const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
             setDoc(playerRef, { 
                 id: user.uid, 
@@ -422,28 +449,22 @@
             switchScreen('screen-lobby');
         });
 
-
-        // --- 7. FIREBASE SYNC (MIT RAUM-FILTER) ---
         function setupFirebaseListeners() {
             if (!user || !currentRoomId) return; 
             
             const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
-            // Der GameState ist jetzt für jeden Raum einzeln!
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
 
-            // Spieler Synchronisation
             onSnapshot(playersRef, (snapshot) => {
                 const now = Date.now();
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    // FILTER: Wir speichern nur Spieler, die denselben Raum-Code haben
                     if (data.roomId === currentRoomId && now - data.lastSeen < 10000) {
                         serverPlayers[doc.id] = data;
                         if (!gameEntities[doc.id] && doc.id !== user.uid) {
                             gameEntities[doc.id] = { x: data.x, y: data.y };
                         }
                     } else {
-                        // Lösche Spieler aus dem Bild, wenn sie einen anderen Raum haben oder inaktiv sind
                         delete serverPlayers[doc.id]; 
                         if (doc.id !== user.uid) delete gameEntities[doc.id];
                     }
@@ -451,7 +472,6 @@
                 updateLobbyUI();
             });
 
-            // Spielstatus Synchronisation
             onSnapshot(roomRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const newState = docSnap.data();
@@ -476,14 +496,12 @@
                     gameState = newState;
                     handleStateChange();
                 } else {
-                    // Falls der Raum noch komplett neu ist, läuft das Spiel logischerweise noch nicht
                     gameState.isPlaying = false;
                     handleStateChange();
                 }
             });
         }
 
-        // START BUTTON
         document.getElementById('btnStartGame').addEventListener('click', async () => {
             if (!user || !currentRoomId) return;
             
@@ -493,7 +511,6 @@
                 if(activeIds.length === 0) activeIds.push(user.uid);
                 const randomGabri = activeIds[Math.floor(Math.random() * activeIds.length)];
 
-                // Raum wird in der Datenbank auf 'Spiel läuft' gesetzt
                 await setDoc(roomRef, {
                     isPlaying: true,
                     roundId: Math.random().toString(36).substring(2, 9),
@@ -512,7 +529,6 @@
             }
         });
 
-        // RESTART BUTTON
         document.getElementById('btnRestart').addEventListener('click', () => {
             if (!currentRoomId) return;
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
@@ -606,16 +622,52 @@
             });
         }
 
-        // --- 8. INPUT HANDLING ---
+        // --- 8. INPUT HANDLING (Touch, Maus & Tastatur) ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        
         let joystick = { active: false, id: null, cx: 0, cy: 0, nx: 0, ny: 0, dx: 0, dy: 0, maxRadius: 60 };
+        let keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
 
         window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
         document.body.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
 
+        // --- Tastatur Events ---
+        window.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.key.toLowerCase())) {
+                keys[e.key] = true;
+                keys[e.key.toLowerCase()] = true; // Fallback für Capslock
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.key.toLowerCase())) {
+                keys[e.key] = false;
+                keys[e.key.toLowerCase()] = false;
+            }
+        });
+
+        // --- Maus Events ---
+        canvas.addEventListener('mousedown', (e) => {
+            if(!joystick.active) {
+                joystick.active = true; joystick.id = 'mouse';
+                joystick.cx = e.clientX; joystick.cy = e.clientY;
+                joystick.nx = e.clientX; joystick.ny = e.clientY;
+                updateJoy();
+            }
+        });
+        window.addEventListener('mousemove', (e) => {
+            if(joystick.active && joystick.id === 'mouse') {
+                joystick.nx = e.clientX; joystick.ny = e.clientY;
+                clampJoy(); updateJoy();
+            }
+        });
+        window.addEventListener('mouseup', () => {
+            if(joystick.id === 'mouse') { joystick.active = false; joystick.id = null; joystick.dx = 0; joystick.dy = 0; }
+        });
+
+        // --- Touch Events ---
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             for(let touch of e.changedTouches) {
@@ -627,32 +679,33 @@
                 }
             }
         }, {passive: false});
-
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
             if(!joystick.active) return;
             for(let touch of e.changedTouches) {
                 if(touch.identifier === joystick.id) {
                     joystick.nx = touch.clientX; joystick.ny = touch.clientY;
-                    const dist = Math.hypot(joystick.nx - joystick.cx, joystick.ny - joystick.cy);
-                    if (dist > joystick.maxRadius) {
-                        const angle = Math.atan2(joystick.ny - joystick.cy, joystick.nx - joystick.cx);
-                        joystick.nx = joystick.cx + Math.cos(angle) * joystick.maxRadius;
-                        joystick.ny = joystick.cy + Math.sin(angle) * joystick.maxRadius;
-                    }
-                    updateJoy();
+                    clampJoy(); updateJoy();
                 }
             }
         }, {passive: false});
-
-        function endJoy(e) {
+        function endJoyTouch(e) {
             e.preventDefault();
             for(let touch of e.changedTouches) {
                 if(touch.identifier === joystick.id) { joystick.active = false; joystick.id = null; joystick.dx = 0; joystick.dy = 0; }
             }
         }
-        canvas.addEventListener('touchend', endJoy, {passive: false});
-        canvas.addEventListener('touchcancel', endJoy, {passive: false});
+        canvas.addEventListener('touchend', endJoyTouch, {passive: false});
+        canvas.addEventListener('touchcancel', endJoyTouch, {passive: false});
+
+        function clampJoy() {
+            const dist = Math.hypot(joystick.nx - joystick.cx, joystick.ny - joystick.cy);
+            if (dist > joystick.maxRadius) {
+                const angle = Math.atan2(joystick.ny - joystick.cy, joystick.nx - joystick.cx);
+                joystick.nx = joystick.cx + Math.cos(angle) * joystick.maxRadius;
+                joystick.ny = joystick.cy + Math.sin(angle) * joystick.maxRadius;
+            }
+        }
 
         function updateJoy() {
             let dx = joystick.nx - joystick.cx; let dy = joystick.ny - joystick.cy;
@@ -660,6 +713,26 @@
             if (dist > 5) { joystick.dx = dx / joystick.maxRadius; joystick.dy = dy / joystick.maxRadius; } 
             else { joystick.dx = 0; joystick.dy = 0; }
         }
+
+        function getMovementVector() {
+            let kx = 0; let ky = 0;
+            if (keys.w || keys.ArrowUp) ky -= 1;
+            if (keys.s || keys.ArrowDown) ky += 1;
+            if (keys.a || keys.ArrowLeft) kx -= 1;
+            if (keys.d || keys.ArrowRight) kx += 1;
+
+            if (kx !== 0 && ky !== 0) {
+                const len = Math.hypot(kx, ky);
+                kx /= len; ky /= len;
+            }
+
+            // Joystick (Maus/Touch) hat Priorität, falls aktiv, ansonsten Tastatur
+            return {
+                dx: joystick.active ? joystick.dx : kx,
+                dy: joystick.active ? joystick.dy : ky
+            };
+        }
+
 
         // --- 9. GAME ENGINE ---
         function checkWall(nx, ny) {
@@ -712,7 +785,6 @@
             const now = Date.now();
 
             if (user) {
-                // Host-Zentral-Timer tickt für genau diesen Raum runter
                 if (gameState.isPlaying && gameState.hostId === user.uid && gameState.timeLeft > 0) {
                     if (now - lastHostTick > 1000) {
                         lastHostTick = now;
@@ -723,8 +795,9 @@
 
                 if (gameState.isPlaying && gameState.timeLeft > 0 && screensLayer.style.display === 'none') {
                     
-                    let mx = joystick.dx * BASE_SPEED * dt;
-                    let my = joystick.dy * BASE_SPEED * dt;
+                    const move = getMovementVector();
+                    let mx = move.dx * BASE_SPEED * dt;
+                    let my = move.dy * BASE_SPEED * dt;
 
                     if (!checkWall(myLocalPlayer.x + mx, myLocalPlayer.y)) myLocalPlayer.x += mx;
                     if (!checkWall(myLocalPlayer.x, myLocalPlayer.y + my)) myLocalPlayer.y += my;
@@ -746,7 +819,6 @@
                     if (now - lastSyncTime > 100) { 
                         lastSyncTime = now;
                         const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
-                        // RAUM-ID WIRD JEDES MAL BESTÄTIGT
                         updateDoc(myRef, { x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y), lastSeen: now, roomId: currentRoomId }).catch(()=>{});
                     }
 
