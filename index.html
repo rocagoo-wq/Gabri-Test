@@ -189,7 +189,6 @@
                 <div class="text-sm text-gray-400 mt-1" id="myTimeDisplay">Zeit als Gabri: 0.0s</div>
             </div>
         </div>
-        <!-- Unten rechts unsichtbarer Bereich für Touch-Kamera etc., falls nötig -->
     </div>
 
     <!-- UI Overlays (Login, Lobby, Leaderboard) -->
@@ -237,11 +236,35 @@
 
         // --- 1. FIREBASE SETUP (STRICT RULES APPLIED) ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-elite-game';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        let firebaseConfig;
+
+        if (typeof __firebase_config !== 'undefined') {
+            // Läuft hier im interaktiven Canvas automatisch
+            firebaseConfig = JSON.parse(__firebase_config);
+        } else {
+            // --- HIER DEINE DATEN VON FIREBASE EINTRAGEN FÜR VERCEL ---
+            // Ersetze diesen gesamten Block mit dem Code, 
+            // den du auf dem Screenshot aus Schritt 3 kopiert hast!
+            firebaseConfig = {
+                apiKey: "HIER_DEIN_API_KEY_EINTRAGEN",
+                authDomain: "dein-projekt-name.firebaseapp.com",
+                projectId: "dein-projekt-name",
+                storageBucket: "dein-projekt-name.appspot.com",
+                messagingSenderId: "123456789",
+                appId: "1:123456789:web:abcdef"
+            };
+            // ---------------------------------------------------------
+        }
+        
+        let app, auth, db;
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (error) {
+            console.error("Firebase konnte nicht geladen werden:", error);
+        }
 
         // --- 2. GAME CONFIGURATION ---
         const GAME_DURATION_MS = 3 * 60 * 1000;
@@ -385,12 +408,18 @@
                 }
             } catch (e) {
                 console.error("Auth failed:", e);
-                alert("Verbindungsfehler. Bitte neu laden.");
+                alert("Verbindungsfehler zur Datenbank. Überprüfe deine Firebase Config im Code!");
             }
         };
 
         // UI Event Listeners
         document.getElementById('btnJoin').addEventListener('click', async () => {
+            // Warnung für Vercel-Nutzer, wenn sie ihre Datenbank noch nicht verlinkt haben!
+            if (firebaseConfig.apiKey === "HIER_DEIN_API_KEY_EINTRAGEN") {
+                alert("WICHTIGER HINWEIS!\n\nDa du das Spiel nun auf Vercel hostest, brauchst du eine eigene Datenbank.\n\nDu musst im Code (Zeile ~184) deine eigene kopierte Firebase-Config einfügen. Ansonsten funktioniert der Multiplayer hier nicht!");
+                return;
+            }
+
             const name = document.getElementById('playerNameInput').value.trim();
             if (!name) return;
             myName = name.substring(0, 12);
@@ -399,29 +428,31 @@
             await initAuth(); // Start Auth ONLY after user clicks Join
         });
 
-        onAuthStateChanged(auth, (currentUser) => {
-            if (currentUser && myName !== "Player") {
-                user = currentUser;
-                
-                // Initiale Position
-                myLocalPlayer.x = Math.random() * (MAP_WIDTH - 200) + 100;
-                myLocalPlayer.y = Math.random() * (MAP_HEIGHT - 200) + 100;
+        if (auth) {
+            onAuthStateChanged(auth, (currentUser) => {
+                if (currentUser && myName !== "Player") {
+                    user = currentUser;
+                    
+                    // Initiale Position
+                    myLocalPlayer.x = Math.random() * (MAP_WIDTH - 200) + 100;
+                    myLocalPlayer.y = Math.random() * (MAP_HEIGHT - 200) + 100;
 
-                // Erstelle mein Dokument in der DB (RULE 1)
-                const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
-                setDoc(playerRef, {
-                    id: user.uid,
-                    name: myName,
-                    x: myLocalPlayer.x,
-                    y: myLocalPlayer.y,
-                    timeAsGabri: 0,
-                    lastSeen: Date.now()
-                });
+                    // Erstelle mein Dokument in der DB (RULE 1)
+                    const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+                    setDoc(playerRef, {
+                        id: user.uid,
+                        name: myName,
+                        x: myLocalPlayer.x,
+                        y: myLocalPlayer.y,
+                        timeAsGabri: 0,
+                        lastSeen: Date.now()
+                    });
 
-                setupFirebaseListeners();
-                requestAnimationFrame(gameLoop);
-            }
-        });
+                    setupFirebaseListeners();
+                    requestAnimationFrame(gameLoop);
+                }
+            });
+        }
 
         // --- 7. FIREBASE MULTIPLAYER LOGIC ---
         function setupFirebaseListeners() {
