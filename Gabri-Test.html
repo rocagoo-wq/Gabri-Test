@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Gabri-Flucht - Elite Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --primary: #00ffcc;
+            --gabri: #ff3366;
+            --glass-bg: rgba(20, 20, 25, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0d0d12;
+            overflow: hidden;
+            touch-action: none; /* Verhindert Wischen/Zoomen auf Mobile */
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Glassmorphism UI Base */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            border-radius: 16px;
+        }
+
+        /* Fullscreen Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: env(safe-area-inset-top, 20px) 20px 20px 20px;
+            z-index: 10;
+        }
+
+        #screens-layer {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, rgba(13,13,18,0.8) 0%, rgba(5,5,8,0.95) 100%);
+            z-index: 50;
+            transition: opacity 0.3s ease;
+        }
+
+        .screen { display: none; width: 100%; max-width: 400px; padding: 20px; }
+        .screen.active { display: block; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Typografie & Inputs */
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            text-align: center;
+            color: white;
+            text-shadow: 0 0 10px var(--primary);
+            font-size: 24px;
+            margin-bottom: 30px;
+            line-height: 1.4;
+        }
+
+        .input-elite {
+            width: 100%;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid rgba(255,255,255,0.1);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 18px;
+            text-align: center;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .input-elite:focus { border-color: var(--primary); box-shadow: 0 0 15px rgba(0,255,204,0.3); }
+
+        .btn-elite {
+            width: 100%;
+            background: linear-gradient(135deg, #00ffcc 0%, #00b38f 100%);
+            color: #000;
+            font-weight: 800;
+            font-size: 18px;
+            padding: 15px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: transform 0.1s, box-shadow 0.1s;
+            pointer-events: auto;
+        }
+        .btn-elite:active { transform: scale(0.96); }
+        
+        .btn-danger { background: linear-gradient(135deg, #ff3366 0%, #cc0033 100%); color: white; }
+
+        /* HUD Elemente */
+        .hud-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: auto;
+        }
+
+        .hud-box {
+            padding: 10px 20px;
+            border-radius: 12px;
+            color: white;
+        }
+
+        .timer-text { font-family: 'Press Start 2P', cursive; font-size: 18px; color: var(--primary); }
+        .status-text { font-size: 16px; font-weight: 600; text-align: right; }
+        
+        .is-gabri-alert {
+            animation: pulse-gabri 1s infinite alternate;
+            color: var(--gabri) !important;
+            text-shadow: 0 0 10px var(--gabri);
+        }
+
+        @keyframes pulse-gabri {
+            from { box-shadow: 0 0 10px var(--gabri), inset 0 0 10px var(--gabri); border-color: var(--gabri); }
+            to { box-shadow: 0 0 30px var(--gabri), inset 0 0 20px var(--gabri); border-color: transparent; }
+        }
+
+        /* Player List Lobby */
+        .player-list { max-height: 200px; overflow-y: auto; margin-bottom: 20px; }
+        .player-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #ccc;
+        }
+        .player-item:last-child { border: none; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #00ffcc; box-shadow: 0 0 8px #00ffcc; }
+
+        /* Leaderboard */
+        .rank-row {
+            display: flex; justify-content: space-between; padding: 12px;
+            background: rgba(255,255,255,0.05); margin-bottom: 8px; border-radius: 8px;
+            font-weight: 600; color: white;
+        }
+        .rank-loser { background: rgba(255, 51, 102, 0.2); border: 1px solid var(--gabri); color: #ff99aa;}
+        .rank-winner { background: rgba(0, 255, 204, 0.1); border: 1px solid var(--primary); color: var(--primary);}
+
+    </style>
+</head>
+<body>
+
+    <!-- Spieloberfläche -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Head-Up Display (HUD) während des Spiels -->
+    <div id="ui-layer" style="display: none;">
+        <div class="hud-header">
+            <div class="glass-panel hud-box" id="hudTimerBox">
+                <div class="timer-text" id="timerDisplay">03:00</div>
+            </div>
+            <div class="glass-panel hud-box" id="hudStatusBox">
+                <div class="status-text" id="roleDisplay">Lade...</div>
+                <div class="text-sm text-gray-400 mt-1" id="myTimeDisplay">Zeit als Gabri: 0.0s</div>
+            </div>
+        </div>
+        <!-- Unten rechts unsichtbarer Bereich für Touch-Kamera etc., falls nötig -->
+    </div>
+
+    <!-- UI Overlays (Login, Lobby, Leaderboard) -->
+    <div id="screens-layer">
+        
+        <!-- Screen 1: Login -->
+        <div id="screen-login" class="screen glass-panel active">
+            <h1>GABRI<br><span style="color:white; font-size: 16px;">FLUCHT</span></h1>
+            <p class="text-gray-300 text-center mb-6 text-sm">Überlebe den Schulhof. Werde nicht zum Gabri.</p>
+            <input type="text" id="playerNameInput" class="input-elite" placeholder="Dein Name" maxlength="12" autocomplete="off">
+            <button id="btnJoin" class="btn-elite">SPIEL BEITRETEN</button>
+        </div>
+
+        <!-- Screen 2: Lobby -->
+        <div id="screen-lobby" class="screen glass-panel">
+            <h2 class="text-2xl font-bold text-center text-white mb-2">LOBBY</h2>
+            <p class="text-center text-gray-400 text-sm mb-4">Warte auf Mitspieler...</p>
+            
+            <div class="glass-panel player-list p-2" id="lobbyPlayerList">
+                <!-- Spieler werden hier generiert -->
+            </div>
+
+            <button id="btnStartGame" class="btn-elite">RUNDE STARTEN (3 MIN)</button>
+        </div>
+
+        <!-- Screen 3: Leaderboard / Game Over -->
+        <div id="screen-leaderboard" class="screen glass-panel">
+            <h2 class="text-2xl font-bold text-center mb-1 text-white">RUNDE BEENDET</h2>
+            <p class="text-center text-red-400 text-sm mb-6 font-semibold">Wer am längsten Gabri war, verliert!</p>
+            
+            <div id="leaderboardList" class="mb-6 max-h-[250px] overflow-y-auto">
+                <!-- Ranks hier -->
+            </div>
+
+            <button id="btnRestart" class="btn-elite btn-danger">NEUE RUNDE IN DER LOBBY</button>
+        </div>
+
+    </div>
+
+    <!-- Firebase Logic & Game Engine -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 1. FIREBASE SETUP (STRICT RULES APPLIED) ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-elite-game';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- 2. GAME CONFIGURATION ---
+        const GAME_DURATION_MS = 3 * 60 * 1000;
+        const MAP_WIDTH = 2000;
+        const MAP_HEIGHT = 2000;
+        const PLAYER_SIZE = 48; // Etwas größer für bessere Sichtbarkeit
+        const BASE_SPEED = 300; 
+        const TAG_COOLDOWN_MS = 2000;
+
+        // --- 3. STATE MANAGEMENT ---
+        let user = null;
+        let myName = "Player";
+        let serverPlayers = {}; // Rohe Daten vom Server
+        let gameEntities = {};  // Interpolierte Entitäten für flüssiges Rendering
+        let gameState = { isPlaying: false, endTime: 0, currentGabri: null, gabriSince: 0, lastTagTime: 0 };
+        
+        // Lokaler Spieler (Sofortige Reaktion)
+        let myLocalPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
+        
+        let lastUpdateTime = performance.now();
+        let lastSyncTime = 0;
+        let particles = [];
+
+        // UI Referenzen
+        const screensLayer = document.getElementById('screens-layer');
+        const uiLayer = document.getElementById('ui-layer');
+        const screenLogin = document.getElementById('screen-login');
+        const screenLobby = document.getElementById('screen-lobby');
+        const screenLeaderboard = document.getElementById('screen-leaderboard');
+        const hudStatusBox = document.getElementById('hudStatusBox');
+        
+        // --- 4. MAP & OBSTACLES (Elite Design) ---
+        const obstacles = [
+            // Außenwände (als visuelle Begrenzung)
+            { x: -50, y: -50, w: MAP_WIDTH+100, h: 50, color: '#1a1a24' },
+            { x: -50, y: MAP_HEIGHT, w: MAP_WIDTH+100, h: 50, color: '#1a1a24' },
+            { x: -50, y: -50, w: 50, h: MAP_HEIGHT+100, color: '#1a1a24' },
+            { x: MAP_WIDTH, y: -50, w: 50, h: MAP_HEIGHT+100, color: '#1a1a24' },
+            // Gebäude (Klassenzimmer, Halle)
+            { x: 200, y: 200, w: 500, h: 300, color: '#1a1a24', glow: true, label: 'HAUPTGEBÄUDE' },
+            { x: 1200, y: 150, w: 600, h: 400, color: '#1a1a24', glow: true, label: 'TURNHALLE' },
+            { x: 300, y: 900, w: 400, h: 500, color: '#1a1a24', glow: true, label: 'MENSA' },
+            { x: 1100, y: 1100, w: 500, h: 300, color: '#1a1a24', glow: true, label: 'BIBLIOTHEK' },
+            // Kleine Blöcke (Tische/Bäume)
+            { x: 850, y: 400, w: 100, h: 100, color: '#2a2a36' },
+            { x: 900, y: 700, w: 150, h: 80, color: '#2a2a36' },
+            { x: 950, y: 1500, w: 100, h: 100, color: '#2a2a36' },
+            { x: 1700, y: 700, w: 100, h: 250, color: '#2a2a36' }
+        ];
+
+        // --- 4.5 CHAIRS & TEACHERS ---
+        // Pseudo-Random Generator (jeder Spieler generiert die Map exakt gleich!)
+        function mulberry32(a) {
+            return function() {
+              var t = a += 0x6D2B79F5;
+              t = Math.imul(t ^ t >>> 15, t | 1);
+              t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+              return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            }
+        }
+        const prng = mulberry32(9999); // Fester Seed für Synchronität
+        
+        // Generiere 40 zufällige Stühle auf dem Gelände
+        for (let i = 0; i < 40; i++) {
+            let cx = prng() * (MAP_WIDTH - 100) + 50;
+            let cy = prng() * (MAP_HEIGHT - 100) + 50;
+            // Prüfen, ob Stuhl im Gebäude spawnt (wir wollen sie eher auf Wegen)
+            let isInside = obstacles.some(obs => cx < obs.x + obs.w && cx + 30 > obs.x && cy < obs.y + obs.h && cy + 30 > obs.y);
+            if (!isInside) {
+                obstacles.push({ x: cx, y: cy, w: 30, h: 30, color: '#5c4033', isChair: true });
+            }
+        }
+
+        // Lehrer (NPCs, die hin und her laufen)
+        const teachers = [
+            { startX: 750, startY: 300, moveX: 300, moveY: 0, speed: 0.001, name: "Herr Müller", currentX: 0, currentY: 0 },
+            { startX: 1000, startY: 800, moveX: 0, moveY: 400, speed: 0.0015, name: "Frau Schmidt", currentX: 0, currentY: 0 },
+            { startX: 400, startY: 1500, moveX: 400, moveY: -200, speed: 0.0008, name: "Herr Weber", currentX: 0, currentY: 0 },
+            { startX: 1500, startY: 800, moveX: -200, moveY: 0, speed: 0.002, name: "Direktor", currentX: 0, currentY: 0 }
+        ];
+
+        // --- 5. SPRITE GENERATOR (Pixel Art) ---
+        function createPixelSprite(type) {
+            const canvas = document.createElement('canvas');
+            const size = 12; // 12x12 Grid für mehr Details
+            canvas.width = size; canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            const isGabri = type === 'gabri';
+            const isTeacher = type === 'teacher';
+
+            const skin = isGabri ? '#ff99aa' : (isTeacher ? '#eebb99' : '#ffcba4');
+            const shirt = isGabri ? '#ff3366' : (isTeacher ? '#555555' : '#00ffcc');
+            const pants = '#1a1a24';
+            const hair = isTeacher ? '#cccccc' : '#1a1a24'; // Lehrer haben graue Haare
+            const shadow = 'rgba(0,0,0,0.3)';
+
+            const layout = [
+                [0,0,0,0,6,6,6,6,0,0,0,0], // 6 = Haare
+                [0,0,0,6,2,2,2,2,6,0,0,0],
+                [0,0,6,2,0,2,2,0,2,6,0,0], // Augen
+                [0,0,6,2,2,2,2,2,2,6,0,0],
+                [0,0,0,6,2,2,2,2,6,0,0,0],
+                [0,0,3,3,3,3,3,3,3,3,0,0], // Shirt
+                [0,3,3,3,3,3,3,3,3,3,3,0],
+                [0,3,3,3,3,3,3,3,3,3,3,0],
+                [0,3,0,4,4,4,4,4,4,0,3,0], // Hose
+                [0,0,0,4,4,0,0,4,4,0,0,0],
+                [0,0,5,5,0,0,0,0,5,5,0,0]  // Schuhe
+            ];
+
+            for(let y=0; y<11; y++) {
+                for(let x=0; x<12; x++) {
+                    let p = layout[y][x];
+                    if(p!==0){
+                        switch(p){
+                            case 6: ctx.fillStyle = hair; break;
+                            case 1: ctx.fillStyle = pants; break; 
+                            case 2: ctx.fillStyle = skin; break;
+                            case 3: ctx.fillStyle = shirt; break;
+                            case 4: ctx.fillStyle = pants; break;
+                            case 5: ctx.fillStyle = '#111'; break;
+                        }
+                        ctx.fillRect(x, y, 1, 1);
+                    }
+                }
+            }
+            return canvas;
+        }
+        const texNormal = createPixelSprite('normal');
+        const texGabri = createPixelSprite('gabri');
+        const texTeacher = createPixelSprite('teacher');
+
+        // --- 6. AUTHENTICATION & INITIALIZATION ---
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) {
+                console.error("Auth failed:", e);
+                alert("Verbindungsfehler. Bitte neu laden.");
+            }
+        };
+
+        // UI Event Listeners
+        document.getElementById('btnJoin').addEventListener('click', async () => {
+            const name = document.getElementById('playerNameInput').value.trim();
+            if (!name) return;
+            myName = name.substring(0, 12);
+            
+            switchScreen('screen-lobby');
+            await initAuth(); // Start Auth ONLY after user clicks Join
+        });
+
+        onAuthStateChanged(auth, (currentUser) => {
+            if (currentUser && myName !== "Player") {
+                user = currentUser;
+                
+                // Initiale Position
+                myLocalPlayer.x = Math.random() * (MAP_WIDTH - 200) + 100;
+                myLocalPlayer.y = Math.random() * (MAP_HEIGHT - 200) + 100;
+
+                // Erstelle mein Dokument in der DB (RULE 1)
+                const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+                setDoc(playerRef, {
+                    id: user.uid,
+                    name: myName,
+                    x: myLocalPlayer.x,
+                    y: myLocalPlayer.y,
+                    timeAsGabri: 0,
+                    lastSeen: Date.now()
+                });
+
+                setupFirebaseListeners();
+                requestAnimationFrame(gameLoop);
+            }
+        });
+
+        // --- 7. FIREBASE MULTIPLAYER LOGIC ---
+        function setupFirebaseListeners() {
+            if (!user) return; // RULE 3 Guard
+
+            const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
+            const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
+
+            // Listen to Players
+            onSnapshot(playersRef, (snapshot) => {
+                const now = Date.now();
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Cleanup inaktive Spieler (timeout 10s)
+                    if (now - data.lastSeen < 10000) {
+                        serverPlayers[doc.id] = data;
+                        // Initiiere Interpolations-Entität falls neu
+                        if (!gameEntities[doc.id] && doc.id !== user.uid) {
+                            gameEntities[doc.id] = { x: data.x, y: data.y };
+                        }
+                    } else {
+                        delete serverPlayers[doc.id];
+                        delete gameEntities[doc.id];
+                    }
+                });
+                updateLobbyUI();
+            }, (error) => console.error("Players Sync Error:", error));
+
+            // Listen to Game State
+            onSnapshot(stateRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    gameState = docSnap.data();
+                    handleStateChange();
+                }
+            }, (error) => console.error("Game State Error:", error));
+        }
+
+        // Spiel starten
+        document.getElementById('btnStartGame').addEventListener('click', async () => {
+            if (!user) return;
+            const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
+            
+            // Random Gabri wählen
+            const activeIds = Object.keys(serverPlayers);
+            if(activeIds.length === 0) activeIds.push(user.uid);
+            const randomGabri = activeIds[Math.floor(Math.random() * activeIds.length)];
+
+            await setDoc(stateRef, {
+                isPlaying: true,
+                endTime: Date.now() + GAME_DURATION_MS,
+                currentGabri: randomGabri,
+                gabriSince: Date.now(),
+                lastTagTime: Date.now()
+            });
+
+            // Zeiten zurücksetzen
+            for(let id of activeIds) {
+                const pRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', id);
+                updateDoc(pRef, { timeAsGabri: 0, lastSeen: Date.now() });
+            }
+        });
+
+        // Restart (Zurück in Lobby)
+        document.getElementById('btnRestart').addEventListener('click', () => {
+            const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
+            updateDoc(stateRef, { isPlaying: false });
+        });
+
+        function handleStateChange() {
+            const now = Date.now();
+            
+            if (gameState.isPlaying && now < gameState.endTime) {
+                // Game Running
+                screensLayer.style.display = 'none';
+                uiLayer.style.display = 'flex';
+                
+                // HUD Update (Visuelles Feedback, wenn man Gabri wird)
+                if (gameState.currentGabri === user.uid) {
+                    hudStatusBox.classList.add('is-gabri-alert');
+                    document.getElementById('roleDisplay').innerText = "DU BIST GABRI! FANG SIE!";
+                } else {
+                    hudStatusBox.classList.remove('is-gabri-alert');
+                    const gName = serverPlayers[gameState.currentGabri]?.name || "Jemand";
+                    document.getElementById('roleDisplay').innerHTML = `<span style="color:var(--primary)">LAUF! ${gName} ist Gabri!</span>`;
+                }
+
+            } else if (gameState.isPlaying && now >= gameState.endTime) {
+                // Game Over -> Leaderboard
+                showLeaderboard();
+            } else {
+                // Lobby
+                switchScreen('screen-lobby');
+                uiLayer.style.display = 'none';
+            }
+        }
+
+        function switchScreen(screenId) {
+            screensLayer.style.display = 'flex';
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function updateLobbyUI() {
+            const list = document.getElementById('lobbyPlayerList');
+            if(!list) return;
+            list.innerHTML = '';
+            let count = 0;
+            for(let id in serverPlayers) {
+                count++;
+                const p = serverPlayers[id];
+                const isMe = id === user?.uid;
+                list.innerHTML += `
+                    <div class="player-item">
+                        <div class="flex items-center gap-3">
+                            <div class="status-dot"></div>
+                            <span class="font-semibold ${isMe ? 'text-primary' : 'text-white'}">${p.name} ${isMe ? '(Du)' : ''}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            if(count === 0) list.innerHTML = '<p class="text-center text-gray-500 py-2">Nur du bist hier...</p>';
+        }
+
+        function getTotalGabriTime(playerId) {
+            const p = serverPlayers[playerId];
+            if (!p) return 0;
+            let total = p.timeAsGabri || 0;
+            if (gameState.isPlaying && gameState.currentGabri === playerId && Date.now() < gameState.endTime) {
+                total += (Date.now() - gameState.gabriSince);
+            }
+            return total;
+        }
+
+        function showLeaderboard() {
+            switchScreen('screen-leaderboard');
+            uiLayer.style.display = 'none';
+            
+            let results = [];
+            for (let id in serverPlayers) {
+                results.push({ name: serverPlayers[id].name, time: getTotalGabriTime(id), id: id });
+            }
+            
+            // Längste Zeit = Verlierer = Platz 1 der Straf-Liste
+            results.sort((a, b) => b.time - a.time);
+
+            const list = document.getElementById('leaderboardList');
+            list.innerHTML = '';
+            
+            results.forEach((r, index) => {
+                let rowClass = "rank-row";
+                let medal = "";
+                if (index === 0) {
+                    rowClass += " rank-loser";
+                    medal = "💀 VERLIERER";
+                } else if (index === results.length - 1 && results.length > 1) {
+                    rowClass += " rank-winner";
+                    medal = "👑 GEWINNER";
+                }
+
+                const timeSec = (r.time / 1000).toFixed(1);
+                list.innerHTML += `
+                    <div class="${rowClass}">
+                        <span>${index + 1}. ${r.name} <span class="text-xs ml-2 opacity-80">${medal}</span></span>
+                        <span>${timeSec}s</span>
+                    </div>
+                `;
+            });
+        }
+
+        // --- 8. INPUT HANDLING (Virtual Joystick) ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let joystick = { active: false, id: null, cx: 0, cy: 0, nx: 0, ny: 0, dx: 0, dy: 0, maxRadius: 60 };
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            for(let touch of e.changedTouches) {
+                if(!joystick.active && touch.clientX < window.innerWidth) { // Überall aktivierbar
+                    joystick.active = true;
+                    joystick.id = touch.identifier;
+                    joystick.cx = touch.clientX;
+                    joystick.cy = touch.clientY;
+                    joystick.nx = touch.clientX;
+                    joystick.ny = touch.clientY;
+                    updateJoy();
+                }
+            }
+        }, {passive: false});
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if(!joystick.active) return;
+            for(let touch of e.changedTouches) {
+                if(touch.identifier === joystick.id) {
+                    joystick.nx = touch.clientX;
+                    joystick.ny = touch.clientY;
+                    
+                    // Clamp visual stick
+                    const dist = Math.hypot(joystick.nx - joystick.cx, joystick.ny - joystick.cy);
+                    if (dist > joystick.maxRadius) {
+                        const angle = Math.atan2(joystick.ny - joystick.cy, joystick.nx - joystick.cx);
+                        joystick.nx = joystick.cx + Math.cos(angle) * joystick.maxRadius;
+                        joystick.ny = joystick.cy + Math.sin(angle) * joystick.maxRadius;
+                    }
+                    updateJoy();
+                }
+            }
+        }, {passive: false});
+
+        function endJoy(e) {
+            e.preventDefault();
+            for(let touch of e.changedTouches) {
+                if(touch.identifier === joystick.id) {
+                    joystick.active = false;
+                    joystick.id = null;
+                    joystick.dx = 0; joystick.dy = 0;
+                }
+            }
+        }
+        canvas.addEventListener('touchend', endJoy, {passive: false});
+        canvas.addEventListener('touchcancel', endJoy, {passive: false});
+
+        function updateJoy() {
+            let dx = joystick.nx - joystick.cx;
+            let dy = joystick.ny - joystick.cy;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 5) {
+                joystick.dx = dx / joystick.maxRadius;
+                joystick.dy = dy / joystick.maxRadius;
+            } else {
+                joystick.dx = 0; joystick.dy = 0;
+            }
+        }
+
+        // --- 9. GAME ENGINE (Physics, Collisions, Render) ---
+        let camera = { x: 0, y: 0 };
+
+        function checkWall(nx, ny) {
+            // Map boundaries
+            if (nx < 0 || ny < 0 || nx + PLAYER_SIZE > MAP_WIDTH || ny + PLAYER_SIZE > MAP_HEIGHT) return true;
+            
+            // Rect Obstacles (inklusive Stühle)
+            for (let obs of obstacles) {
+                if (nx < obs.x + obs.w && nx + PLAYER_SIZE > obs.x &&
+                    ny < obs.y + obs.h && ny + PLAYER_SIZE > obs.y) {
+                    return true;
+                }
+            }
+            
+            // Lehrer Kollision (dynamische Wände)
+            for (let t of teachers) {
+                if (nx < t.currentX + PLAYER_SIZE && nx + PLAYER_SIZE > t.currentX &&
+                    ny < t.currentY + PLAYER_SIZE && ny + PLAYER_SIZE > t.currentY) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        function createParticles(x, y, color) {
+            for(let i=0; i<15; i++) {
+                particles.push({
+                    x: x + PLAYER_SIZE/2, y: y + PLAYER_SIZE/2,
+                    vx: (Math.random() - 0.5) * 400, vy: (Math.random() - 0.5) * 400,
+                    life: 1.0, color: color
+                });
+            }
+        }
+
+        async function checkTags() {
+            if (!user || !gameState.isPlaying || gameState.currentGabri !== user.uid) return;
+            const now = Date.now();
+            if (now < gameState.lastTagTime + TAG_COOLDOWN_MS) return;
+
+            for (let id in serverPlayers) {
+                if (id === user.uid) continue;
+                const p = gameEntities[id] || serverPlayers[id];
+                
+                // Distanz-Check (Zentrum zu Zentrum)
+                const cx1 = myLocalPlayer.x + PLAYER_SIZE/2;
+                const cy1 = myLocalPlayer.y + PLAYER_SIZE/2;
+                const cx2 = p.x + PLAYER_SIZE/2;
+                const cy2 = p.y + PLAYER_SIZE/2;
+                const dist = Math.hypot(cx2 - cx1, cy2 - cy1);
+
+                if (dist < PLAYER_SIZE * 0.9) { // Kollision!
+                    createParticles(p.x, p.y, '#ff3366'); // Visuelles Feedback lokal sofort
+                    
+                    const timeGained = now - gameState.gabriSince;
+                    const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'global');
+                    const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+                    
+                    try {
+                        // Parallel ausführen für Speed
+                        Promise.all([
+                            updateDoc(myRef, { timeAsGabri: increment(timeGained) }),
+                            updateDoc(stateRef, { currentGabri: id, gabriSince: now, lastTagTime: now })
+                        ]);
+                    } catch(e) { console.error(e); }
+                    break;
+                }
+            }
+        }
+
+        function gameLoop(timestamp) {
+            const dt = Math.min((timestamp - lastUpdateTime) / 1000, 0.1); // Max 100ms dt limitieren
+            lastUpdateTime = timestamp;
+
+            const now = Date.now();
+
+            if (user && screensLayer.style.display === 'none' && gameState.isPlaying) {
+                // Lehrer Positionen aktualisieren (Zeitbasiert = Sync ohne Server)
+                teachers.forEach(t => {
+                    const time = now * t.speed;
+                    const offset = Math.sin(time);
+                    t.currentX = t.startX + t.moveX * offset;
+                    t.currentY = t.startY + t.moveY * offset;
+                });
+
+                // 1. Lokale Physik updaten
+                let mx = joystick.dx * BASE_SPEED * dt;
+                let my = joystick.dy * BASE_SPEED * dt;
+
+                // X und Y Achse getrennt testen für Slide-Effekt an Wänden
+                if (!checkWall(myLocalPlayer.x + mx, myLocalPlayer.y)) myLocalPlayer.x += mx;
+                if (!checkWall(myLocalPlayer.x, myLocalPlayer.y + my)) myLocalPlayer.y += my;
+
+                // 2. Kamera Update (Smooth Follow)
+                const targetCamX = myLocalPlayer.x + PLAYER_SIZE/2 - canvas.width/2;
+                const targetCamY = myLocalPlayer.y + PLAYER_SIZE/2 - canvas.height/2;
+                camera.x += (targetCamX - camera.x) * 10 * dt;
+                camera.y += (targetCamY - camera.y) * 10 * dt;
+
+                // Kamera klemmen
+                camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width));
+                camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
+
+                // 3. Andere Spieler Interpolieren (Lerp)
+                for(let id in serverPlayers) {
+                    if (id !== user.uid && gameEntities[id]) {
+                        const targetX = serverPlayers[id].x;
+                        const targetY = serverPlayers[id].y;
+                        // Interpoliere Position
+                        gameEntities[id].x += (targetX - gameEntities[id].x) * 15 * dt;
+                        gameEntities[id].y += (targetY - gameEntities[id].y) * 15 * dt;
+                    }
+                }
+
+                // 4. Server Sync
+                if (now - lastSyncTime > 100) { // 10 FPS Sync
+                    lastSyncTime = now;
+                    const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+                    updateDoc(myRef, {
+                        x: Math.round(myLocalPlayer.x),
+                        y: Math.round(myLocalPlayer.y),
+                        lastSeen: now
+                    }).catch(()=>{});
+                }
+
+                // 5. Spiel Logik
+                checkTags();
+
+                // 6. HUD Update
+                const left = Math.max(0, gameState.endTime - now);
+                const min = Math.floor(left / 60000);
+                const sec = Math.floor((left % 60000) / 1000);
+                document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+                document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(getTotalGabriTime(user.uid)/1000).toFixed(1)}s`;
+            }
+
+            render(dt);
+            requestAnimationFrame(gameLoop);
+        }
+
+        function render(dt) {
+            // Hintergrund
+            ctx.fillStyle = '#0d0d12'; // Dunkelgrau
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // Floor Grid (Premium Effekt für Geschwindigkeitsgefühl)
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.lineWidth = 2;
+            const gridSize = 100;
+            const startX = Math.floor(camera.x / gridSize) * gridSize;
+            const startY = Math.floor(camera.y / gridSize) * gridSize;
+            
+            ctx.beginPath();
+            for(let x = startX; x < camera.x + canvas.width; x += gridSize) {
+                if(x >= 0 && x <= MAP_WIDTH) { ctx.moveTo(x, 0); ctx.lineTo(x, MAP_HEIGHT); }
+            }
+            for(let y = startY; y < camera.y + canvas.height; y += gridSize) {
+                if(y >= 0 && y <= MAP_HEIGHT) { ctx.moveTo(0, y); ctx.lineTo(MAP_WIDTH, y); }
+            }
+            ctx.stroke();
+
+            // Hindernisse & Stühle
+            for(let obs of obstacles) {
+                ctx.fillStyle = obs.color;
+                
+                if (obs.isChair) {
+                    // Stuhl zeichnen
+                    ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ctx.fillRect(obs.x + 2, obs.y + 2, obs.w - 4, obs.h - 4); // Sitzfläche
+                    
+                    // Emoji für den Stuhl
+                    ctx.fillStyle = 'white';
+                    ctx.font = '16px "Outfit"';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🪑', obs.x + obs.w/2, obs.y + obs.h/2 + 2);
+                } else {
+                    // Normales Gebäude
+                    ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                    
+                    if(obs.glow) {
+                        ctx.strokeStyle = 'rgba(0, 255, 204, 0.3)';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+                        
+                        // Inneres Leuchten
+                        ctx.strokeStyle = 'rgba(0, 255, 204, 0.1)';
+                        ctx.lineWidth = 8;
+                        ctx.strokeRect(obs.x+4, obs.y+4, obs.w-8, obs.h-8);
+                    }
+
+                    if(obs.label) {
+                        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                        ctx.font = 'bold 30px "Outfit"';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(obs.label, obs.x + obs.w/2, obs.y + obs.h/2);
+                    }
+                }
+            }
+
+            // Partikel rendern
+            for(let i=particles.length-1; i>=0; i--) {
+                let p = particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt * 2;
+                if(p.life <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.fillRect(p.x, p.y, 8, 8);
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Lehrer rendern
+            for(let t of teachers) {
+                ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                ctx.shadowBlur = 10;
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(texTeacher, t.currentX, t.currentY, PLAYER_SIZE, PLAYER_SIZE);
+                ctx.shadowBlur = 0; // Reset
+
+                // Namensschild Lehrer
+                ctx.fillStyle = '#aaaaaa';
+                ctx.font = '600 12px "Outfit"';
+                ctx.textAlign = 'center';
+                const textWidth = ctx.measureText(t.name).width;
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(t.currentX + PLAYER_SIZE/2 - textWidth/2 - 4, t.currentY - 24, textWidth + 8, 18);
+                ctx.fillStyle = '#cccccc';
+                ctx.fillText(t.name, t.currentX + PLAYER_SIZE/2, t.currentY - 10);
+            }
+
+            // Spieler rendern
+            const nowTime = Date.now();
+            for(let id in serverPlayers) {
+                const sp = serverPlayers[id];
+                const isMe = (id === user?.uid);
+                const isGabri = (id === gameState.currentGabri);
+                
+                // Koordinaten (Lokal vs Interpoliert)
+                let px = isMe ? myLocalPlayer.x : (gameEntities[id]?.x || sp.x);
+                let py = isMe ? myLocalPlayer.y : (gameEntities[id]?.y || sp.y);
+
+                // Gabri Aura & Schatten
+                if (isGabri) {
+                    const pulse = Math.abs(Math.sin(now * 0.005)) * 10;
+                    ctx.shadowColor = '#ff3366';
+                    ctx.shadowBlur = 20 + pulse;
+                } else {
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                    ctx.shadowBlur = 10;
+                }
+
+                // Sprite
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(isGabri ? texGabri : texNormal, px, py, PLAYER_SIZE, PLAYER_SIZE);
+                ctx.shadowBlur = 0; // Reset shadow
+
+                // Cooldown Indikator (Ring um Gabri)
+                if (isGabri && now < gameState.lastTagTime + TAG_COOLDOWN_MS) {
+                    const progress = (now - gameState.lastTagTime) / TAG_COOLDOWN_MS;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(px + PLAYER_SIZE/2, py + PLAYER_SIZE/2, PLAYER_SIZE*0.8, -Math.PI/2, (-Math.PI/2) + (Math.PI*2*progress));
+                    ctx.stroke();
+                }
+
+                // Namensschild
+                ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
+                ctx.font = '600 14px "Outfit"';
+                ctx.textAlign = 'center';
+                // Dunkler Hintergrund für Lesbarkeit
+                const textWidth = ctx.measureText(sp.name).width;
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(px + PLAYER_SIZE/2 - textWidth/2 - 4, py - 24, textWidth + 8, 18);
+                
+                ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
+                ctx.fillText(sp.name, px + PLAYER_SIZE/2, py - 10);
+            }
+
+            ctx.restore(); // Kamera Transformation beenden
+
+            // Virtueller Joystick (On-Screen)
+            if (joystick.active) {
+                ctx.save();
+                
+                // Outer ring
+                ctx.beginPath();
+                ctx.arc(joystick.cx, joystick.cy, joystick.maxRadius, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                ctx.lineWidth = 2;
+                ctx.fill();
+                ctx.stroke();
+
+                // Inner nub
+                ctx.beginPath();
+                ctx.arc(joystick.nx, joystick.ny, 25, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(0, 255, 204, 0.4)';
+                ctx.shadowColor = '#00ffcc';
+                ctx.shadowBlur = 15;
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+    </script>
+</body>
+</html>
