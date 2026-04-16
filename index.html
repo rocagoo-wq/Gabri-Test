@@ -174,7 +174,6 @@
         .rank-loser { background: rgba(255, 51, 102, 0.2); border: 1px solid var(--gabri); color: #ff99aa;}
         .rank-winner { background: rgba(0, 255, 204, 0.1); border: 1px solid var(--primary); color: var(--primary);}
 
-        /* Etagen-Anzeige */
         #floorDisplay {
             position: absolute;
             bottom: 20px;
@@ -237,12 +236,11 @@
     </div>
 
     <div id="screens-layer">
-        
         <div id="screen-login" class="screen glass-panel active">
             <h1>GABRI<br><span style="color:white; font-size: 16px;">FLUCHT</span></h1>
             <p class="text-gray-300 text-center mb-6 text-sm">
                 Überlebe den Schulhof.<br>
-                <span class="text-xs text-primary">(Steuerung per Touch, Maus oder WASD/Pfeiltasten)</span>
+                <span class="text-xs text-primary">(Touch-Joysticks oder WASD/Leertaste)</span>
             </p>
             <input type="text" id="playerNameInput" class="input-elite" placeholder="Dein Name" maxlength="12" autocomplete="off">
             <button id="btnJoin" class="btn-elite">WEITER</button>
@@ -258,18 +256,14 @@
         <div id="screen-lobby" class="screen glass-panel">
             <h2 id="lobbyTitle" class="text-2xl font-bold text-center text-primary mb-2">LOBBY</h2>
             <p class="text-center text-gray-400 text-sm mb-4">Warte auf Mitspieler... (Namen in der Liste)</p>
-            
             <div class="glass-panel player-list p-2" id="lobbyPlayerList"></div>
-
             <button id="btnStartGame" class="btn-elite">RUNDE STARTEN (3 MIN)</button>
         </div>
 
         <div id="screen-leaderboard" class="screen glass-panel">
             <h2 class="text-2xl font-bold text-center mb-1 text-white">RUNDE BEENDET</h2>
             <p class="text-center text-red-400 text-sm mb-6 font-semibold">Wer am längsten Gabri war, verliert!</p>
-            
             <div id="leaderboardList" class="mb-6 max-h-[250px] overflow-y-auto pointer-events-auto"></div>
-
             <button id="btnRestart" class="btn-elite btn-danger">ZURÜCK ZUR LOBBY</button>
         </div>
     </div>
@@ -280,7 +274,6 @@
         import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-elite-game';
-        
         let firebaseConfig;
         if (typeof __firebase_config !== 'undefined') {
             firebaseConfig = JSON.parse(__firebase_config);
@@ -301,12 +294,11 @@
             auth = getAuth(app);
             db = getFirestore(app);
         } catch (error) {
-            console.error("Firebase konnte nicht geladen werden:", error);
+            console.error("Firebase:", error);
         }
 
-        const GAME_DURATION_SEC = 180; // 3 Minuten
+        const GAME_DURATION_SEC = 180; 
         const MAP_WIDTH = 2500;
-        // DOPPELTE HÖHE FÜR 2 ETAGEN (0-2000 ist EG, 2000-4000 ist OG)
         const MAP_HEIGHT = 4000; 
         const PLAYER_SIZE = 40;
         const BASE_SPEED = 300; 
@@ -318,16 +310,25 @@
         
         let serverPlayers = {}; 
         let gameEntities = {};  
-        let gameState = { isPlaying: false, timeLeft: 0, currentGabri: null, hostId: null, roundId: null, tagCounter: 0 };
+        let gameState = { 
+            isPlaying: false, timeLeft: 0, currentGabri: null, hostId: null, roundId: null, tagCounter: 0,
+            ball_x: 1850, ball_y: 1500, ball_owner: null, ball_ts: 0, ball_startX: 1850, ball_startY: 1500,
+            boss_active: false, boss_hp: 100, boss_x: 1250, boss_y: 3000, boss_tx: 1250, boss_ty: 3000,
+            sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null
+        };
         
         let currentRoundId = null;
         let localCurrentGabri = null;
         let localGabriSince = 0;
         let localTagCounter = 0;
         let lastHostTick = 0;
-        let lastStairTime = 0; // Cooldown für Treppen
+        let lastStairTime = 0; 
+        let lastConfettiTs = 0;
 
         let myLocalPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
+        let myFacing = { x: 1, y: 0 }; 
+        let myHeldItem = null; // 'ball' oder 'swordX'
+        
         let lastUpdateTime = performance.now();
         let lastSyncTime = 0;
         let particles = [];
@@ -338,27 +339,32 @@
         const canvasElement = document.getElementById('gameCanvas');
         let camera = { x: 0, y: 0 };
 
-        // --- MAP BUILDER ARCHITEKTUR ---
+        // --- MAP BUILDER ---
         let obstacles = [];
         let labels = [];
         let stairs = [];
+        
+        // Basketballkorb (Turnhalle)
+        const hoop = { x: 1850, y: 1115, w: 80, h: 20 };
 
-        // Begrenzungswände (Außen) EG
+        // Schwert Spawnpunkte (um den Boss im OG)
+        const swordBases = {
+            sword1: {x: 1150, y: 2900},
+            sword2: {x: 1350, y: 2900},
+            sword3: {x: 1150, y: 3100},
+            sword4: {x: 1350, y: 3100}
+        };
+
         obstacles.push({x: -50, y: -50, w: MAP_WIDTH+100, h: 50, isWall: true});
         obstacles.push({x: -50, y: -50, w: 50, h: 2000+100, isWall: true});
         obstacles.push({x: MAP_WIDTH, y: -50, w: 50, h: 2000+100, isWall: true});
-        // Trennwand EG / OG (Unpassierbar ohne Treppen)
         obstacles.push({x: -50, y: 1980, w: MAP_WIDTH+100, h: 40, isWall: true});
-        // Begrenzungswände (Außen) OG
         obstacles.push({x: -50, y: MAP_HEIGHT, w: MAP_WIDTH+100, h: 50, isWall: true});
         obstacles.push({x: -50, y: 2000, w: 50, h: 2000+100, isWall: true});
         obstacles.push({x: MAP_WIDTH, y: 2000, w: 50, h: 2000+100, isWall: true});
 
-        // Funktion zum Erstellen eines Raumes mit Türen und Interieur
         function buildRoom(rx, ry, rw, rh, doorEdge, doorOffset, doorWidth, labelText, isEmptyRoom=false) {
-            const wall = 20; // Wanddicke
-            
-            // Wände bauen (mit Lücken für Türen)
+            const wall = 20; 
             if (doorEdge === 'top') {
                 obstacles.push({x: rx, y: ry, w: doorOffset, h: wall, isWall: true});
                 obstacles.push({x: rx + doorOffset + doorWidth, y: ry, w: rw - doorOffset - doorWidth, h: wall, isWall: true});
@@ -379,24 +385,17 @@
                 obstacles.push({x: rx + rw - wall, y: ry + doorOffset + doorWidth, w: wall, h: rh - doorOffset - doorWidth, isWall: true});
             } else { obstacles.push({x: rx + rw - wall, y: ry, w: wall, h: rh, isWall: true}); }
 
-            // Beschriftung in die Mitte des Raumes
             if (labelText) labels.push({x: rx + rw/2, y: ry + rh/2, text: labelText});
 
-            // Tische und Stühle (Interieur) generieren
             if (!isEmptyRoom) {
                 let cols = Math.floor((rw - wall*2) / 140);
                 let rows = Math.floor((rh - wall*2) / 140);
                 let padX = (rw - wall*2 - (cols * 140)) / 2;
                 let padY = (rh - wall*2 - (rows * 140)) / 2;
-                
                 for (let r=0; r<rows; r++) {
                     for (let c=0; c<cols; c++) {
-                        let tx = rx + wall + padX + c*140 + 30;
-                        let ty = ry + wall + padY + r*140 + 30;
-                        
-                        // Tisch
+                        let tx = rx + wall + padX + c*140 + 30; let ty = ry + wall + padY + r*140 + 30;
                         obstacles.push({x: tx, y: ty, w: 80, h: 40, isTable: true});
-                        // Stühle darum herum
                         obstacles.push({x: tx + 10, y: ty - 25, w: 20, h: 20, isChair: true, dir: 'up'});
                         obstacles.push({x: tx + 50, y: ty - 25, w: 20, h: 20, isChair: true, dir: 'up'});
                         obstacles.push({x: tx + 10, y: ty + 45, w: 20, h: 20, isChair: true, dir: 'down'});
@@ -406,53 +405,55 @@
             }
         }
 
-        // --- ERDGESCHOSS (0 - 2000) ---
         buildRoom(100, 100, 800, 500, 'right', 200, 120, 'MATHE (EG)');
         buildRoom(1500, 100, 900, 500, 'left', 200, 120, 'BIOLOGIE (EG)');
         buildRoom(100, 1300, 700, 600, 'top', 300, 150, 'MENSA (EG)');
-        buildRoom(1300, 1100, 1100, 800, 'left', 400, 200, 'TURNHALLE (EG)', true); // Turnhalle ist leer
+        buildRoom(1300, 1100, 1100, 800, 'left', 400, 200, 'TURNHALLE (EG)', true); 
 
-        // --- OBERGESCHOSS (2000 - 4000) ---
         buildRoom(100, 2100, 800, 500, 'right', 200, 120, 'CHEMIE (OG)');
         buildRoom(1500, 2100, 900, 500, 'left', 200, 120, 'PHYSIK (OG)');
         buildRoom(100, 3300, 1000, 600, 'top', 400, 120, 'LEHRERZIMMER (OG)');
         buildRoom(1500, 3300, 900, 600, 'top', 300, 120, 'BIBLIOTHEK (OG)');
 
-        // --- TREPPEN (Teleporter zwischen EG und OG) ---
-        // Treppe Links
         stairs.push({ x: 1000, y: 300, w: 120, h: 160, targetY: 2300, label: 'ZUM OG' });
         stairs.push({ x: 1000, y: 2300, w: 120, h: 160, targetY: 300, label: 'ZUM EG' });
-        // Treppe Unten Mitte
         stairs.push({ x: 900, y: 1700, w: 160, h: 120, targetY: 3700, label: 'ZUM OG' });
         stairs.push({ x: 900, y: 3700, w: 160, h: 120, targetY: 1700, label: 'ZUM EG' });
 
         const teachers = [
-            // EG Lehrer
-            { startX: 1150, startY: 800, moveX: 0, moveY: 600, speed: 0.001, name: "Herr Müller (EG)", currentX: 0, currentY: 0 },
-            { startX: 200, startY: 800, moveX: 600, moveY: 0, speed: 0.0015, name: "Frau Schmidt (EG)", currentX: 0, currentY: 0 },
-            // OG Lehrer
-            { startX: 1150, startY: 2800, moveX: 0, moveY: 500, speed: 0.0012, name: "Herr Weber (OG)", currentX: 0, currentY: 0 },
-            { startX: 1500, startY: 2800, moveX: 500, moveY: 0, speed: 0.0018, name: "Direktor (OG)", currentX: 0, currentY: 0 }
+            { startX: 1150, startY: 800, moveX: 0, moveY: 600, speed: 0.001, name: "Herr Müller", currentX: 0, currentY: 0 },
+            { startX: 200, startY: 800, moveX: 600, moveY: 0, speed: 0.0015, name: "Frau Schmidt", currentX: 0, currentY: 0 },
+            { startX: 1150, startY: 2800, moveX: 0, moveY: 500, speed: 0.0012, name: "Herr Weber", currentX: 0, currentY: 0 }
         ];
 
-        function createPixelSprite(type) {
+        // ANIMIERTE SPRITES (Frame 0 und 1)
+        function createPixelSprite(type, frame=0) {
             const canvas = document.createElement('canvas');
             canvas.width = 12; canvas.height = 12;
             const ctx = canvas.getContext('2d');
             
             const isGabri = type === 'gabri';
             const isTeacher = type === 'teacher';
-            const skin = isGabri ? '#ff99aa' : (isTeacher ? '#eebb99' : '#ffcba4');
-            const shirt = isGabri ? '#ff3366' : (isTeacher ? '#555555' : '#00ffcc');
-            const pants = '#1a1a24';
-            const hair = isTeacher ? '#cccccc' : '#1a1a24';
+            const isBoss = type === 'boss';
 
-            const layout = [
+            const skin = isGabri ? '#ff99aa' : (isTeacher ? '#eebb99' : (isBoss ? '#ff0000' : '#ffcba4'));
+            const shirt = isGabri ? '#ff3366' : (isTeacher ? '#555555' : (isBoss ? '#220000' : '#00ffcc'));
+            const pants = isBoss ? '#440000' : '#1a1a24';
+            const hair = isTeacher ? '#cccccc' : (isBoss ? '#ffaa00' : '#1a1a24');
+
+            let layout = [
                 [0,0,0,0,6,6,6,6,0,0,0,0], [0,0,0,6,2,2,2,2,6,0,0,0], [0,0,6,2,0,2,2,0,2,6,0,0],
                 [0,0,6,2,2,2,2,2,2,6,0,0], [0,0,0,6,2,2,2,2,6,0,0,0], [0,0,3,3,3,3,3,3,3,3,0,0],
                 [0,3,3,3,3,3,3,3,3,3,3,0], [0,3,3,3,3,3,3,3,3,3,3,0], [0,3,0,4,4,4,4,4,4,0,3,0],
                 [0,0,0,4,4,0,0,4,4,0,0,0], [0,0,5,5,0,0,0,0,5,5,0,0]
             ];
+
+            // Gehanimation: Beine verschieben
+            if (frame === 1) {
+                layout[9] = [0,0,0,4,4,0,0,0,0,0,0,0];
+                layout[10]= [0,0,5,5,0,0,0,4,4,0,0,0];
+            }
+
             for(let y=0; y<11; y++) {
                 for(let x=0; x<12; x++) {
                     let p = layout[y][x];
@@ -468,19 +469,12 @@
             }
             return canvas;
         }
-        const texNormal = createPixelSprite('normal');
-        const texGabri = createPixelSprite('gabri');
-        const texTeacher = createPixelSprite('teacher');
+        const texNormal = [createPixelSprite('normal', 0), createPixelSprite('normal', 1)];
+        const texGabri = [createPixelSprite('gabri', 0), createPixelSprite('gabri', 1)];
+        const texTeacher = [createPixelSprite('teacher', 0), createPixelSprite('teacher', 1)];
+        const texBoss = [createPixelSprite('boss', 0), createPixelSprite('boss', 1)];
 
-        document.getElementById('btnJoin').addEventListener('click', async () => {
-            const name = document.getElementById('playerNameInput').value.trim();
-            if (!name) return;
-            myName = name.substring(0, 12);
-            
-            const btn = document.getElementById('btnJoin');
-            btn.innerText = "LÄDT...";
-            btn.disabled = true; 
-            
+        const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
@@ -488,18 +482,21 @@
                     await signInAnonymously(auth);
                 }
                 user = auth.currentUser;
-                
-                if (user) {
-                    switchScreen('screen-room');
-                } else {
-                    throw new Error("Konnte Spieler nicht verifizieren.");
-                }
+                if (user) switchScreen('screen-room');
             } catch (e) {
-                console.error(e);
                 alert("Firebase Fehler beim Login: " + e.message);
-                btn.innerText = "WEITER";
-                btn.disabled = false;
+                document.getElementById('btnJoin').innerText = "WEITER";
+                document.getElementById('btnJoin').disabled = false;
             }
+        };
+
+        document.getElementById('btnJoin').addEventListener('click', async () => {
+            const name = document.getElementById('playerNameInput').value.trim();
+            if (!name) return;
+            myName = name.substring(0, 12);
+            document.getElementById('btnJoin').innerText = "LÄDT...";
+            document.getElementById('btnJoin').disabled = true; 
+            await initAuth(); 
         });
 
         if (auth) {
@@ -511,25 +508,16 @@
         document.getElementById('btnJoinRoom').addEventListener('click', () => {
             let code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
             if (!code) code = Math.random().toString(36).substring(2, 6).toUpperCase();
-            
             currentRoomId = code;
             document.getElementById('lobbyTitle').innerText = "RAUM: " + currentRoomId;
 
-            // SICHERER SPAWN IM INNENHOF DES ERDGESCHOSSES (X=1150, Y=800)
             myLocalPlayer.x = 1150 + Math.random()*100;
             myLocalPlayer.y = 800 + Math.random()*100;
             camera.x = myLocalPlayer.x - window.innerWidth/2;
             camera.y = myLocalPlayer.y - window.innerHeight/2;
 
             const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
-            setDoc(playerRef, { 
-                id: user.uid, 
-                name: myName, 
-                roomId: currentRoomId, 
-                x: myLocalPlayer.x, y: myLocalPlayer.y, 
-                timeAsGabri: 0, 
-                lastSeen: Date.now() 
-            });
+            setDoc(playerRef, { id: user.uid, name: myName, roomId: currentRoomId, x: myLocalPlayer.x, y: myLocalPlayer.y, timeAsGabri: 0, lastSeen: Date.now() });
 
             setupFirebaseListeners();
             requestAnimationFrame(gameLoop);
@@ -548,9 +536,7 @@
                     const data = doc.data();
                     if (data.roomId === currentRoomId && now - data.lastSeen < 10000) {
                         serverPlayers[doc.id] = data;
-                        if (!gameEntities[doc.id] && doc.id !== user.uid) {
-                            gameEntities[doc.id] = { x: data.x, y: data.y };
-                        }
+                        if (!gameEntities[doc.id] && doc.id !== user.uid) gameEntities[doc.id] = { x: data.x, y: data.y };
                     } else {
                         delete serverPlayers[doc.id]; 
                         if (doc.id !== user.uid) delete gameEntities[doc.id];
@@ -562,7 +548,6 @@
             onSnapshot(roomRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const newState = docSnap.data();
-                    
                     if (newState.isPlaying && newState.roundId !== currentRoundId) {
                         currentRoundId = newState.roundId;
                         localCurrentGabri = newState.currentGabri;
@@ -571,12 +556,15 @@
                         
                         myLocalPlayer.x = 1150 + Math.random()*100;
                         myLocalPlayer.y = 800 + Math.random()*100;
-                    
                     } else if (newState.isPlaying && newState.tagCounter !== localTagCounter) {
                         localTagCounter = newState.tagCounter;
                         localCurrentGabri = newState.currentGabri;
                         localGabriSince = Date.now();
                     }
+                    
+                    // Inventar-Check (Wurde mir etwas weggenommen?)
+                    if (myHeldItem === 'ball' && newState.ball_owner !== user.uid) myHeldItem = null;
+                    if (myHeldItem && myHeldItem.startsWith('sword') && newState[myHeldItem+'_owner'] !== user.uid) myHeldItem = null;
 
                     gameState = newState;
                     handleStateChange();
@@ -601,7 +589,11 @@
                     currentGabri: randomGabri,
                     tagCounter: 0,
                     hostId: user.uid,
-                    timeLeft: GAME_DURATION_SEC
+                    timeLeft: GAME_DURATION_SEC,
+                    // Items und Boss init
+                    ball_x: 1850, ball_y: 1500, ball_owner: null, ball_ts: 0, ball_startX: 1850, ball_startY: 1500,
+                    boss_active: false, boss_hp: 100, boss_x: 1250, boss_y: 3000, boss_tx: 1250, boss_ty: 3000,
+                    sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null
                 });
 
                 for(let id of activeIds) {
@@ -653,14 +645,11 @@
             const list = document.getElementById('lobbyPlayerList');
             if(!list) return;
             list.innerHTML = '';
-            let count = 0;
             for(let id in serverPlayers) {
-                count++;
                 const p = serverPlayers[id];
                 const isMe = id === user?.uid;
                 list.innerHTML += `<div class="player-item"><div class="flex items-center gap-3"><div class="status-dot"></div><span class="font-semibold ${isMe ? 'text-primary' : 'text-white'}">${p.name} ${isMe ? '(Du)' : ''}</span></div></div>`;
             }
-            if(count === 0) list.innerHTML = '<p class="text-center text-gray-500 py-2">Nur du bist hier...</p>';
         }
 
         function getTotalGabriTime(playerId) {
@@ -687,111 +676,165 @@
                 let medal = "";
                 if (index === 0) { rowClass += " rank-loser"; medal = "💀 VERLIERER"; } 
                 else if (index === results.length - 1 && results.length > 1) { rowClass += " rank-winner"; medal = "👑 GEWINNER"; }
-
                 const timeSec = (r.time / 1000).toFixed(1);
                 list.innerHTML += `<div class="${rowClass}"><span>${index + 1}. ${r.name} <span class="text-xs ml-2 opacity-80">${medal}</span></span><span>${timeSec}s</span></div>`;
             });
         }
 
+        // --- 8. INPUT HANDLING (FESTE JOYSTICKS) ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
-        let joystick = { active: false, id: null, cx: 0, cy: 0, nx: 0, ny: 0, dx: 0, dy: 0, maxRadius: 60 };
-        let keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
+        let joyBase = { x: 120, y: window.innerHeight - 120, r: 60 };
+        let actBase = { x: window.innerWidth - 120, y: window.innerHeight - 120, r: 50 };
+        
+        let joystick = { active: false, id: null, nx: joyBase.x, ny: joyBase.y, dx: 0, dy: 0 };
+        let keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false, ' ': false };
 
-        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+        window.addEventListener('resize', () => { 
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight; 
+            joyBase.y = window.innerHeight - 120;
+            actBase.x = window.innerWidth - 120; actBase.y = window.innerHeight - 120;
+        });
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
         document.body.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
 
         window.addEventListener('keydown', (e) => {
             if (keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.key.toLowerCase())) {
-                keys[e.key] = true; keys[e.key.toLowerCase()] = true;
+                let key = e.key.toLowerCase();
+                keys[key] = true;
+                if (key === ' ' || key === 'spacebar') doAction(); // Action via Leertaste
             }
         });
         window.addEventListener('keyup', (e) => {
             if (keys.hasOwnProperty(e.key) || keys.hasOwnProperty(e.key.toLowerCase())) {
-                keys[e.key] = false; keys[e.key.toLowerCase()] = false;
+                keys[e.key.toLowerCase()] = false;
             }
         });
 
-        canvas.addEventListener('mousedown', (e) => {
-            if(!joystick.active) {
-                joystick.active = true; joystick.id = 'mouse';
-                joystick.cx = e.clientX; joystick.cy = e.clientY;
-                joystick.nx = e.clientX; joystick.ny = e.clientY;
-                updateJoy();
-            }
-        });
-        window.addEventListener('mousemove', (e) => {
-            if(joystick.active && joystick.id === 'mouse') {
-                joystick.nx = e.clientX; joystick.ny = e.clientY;
-                clampJoy(); updateJoy();
-            }
-        });
-        window.addEventListener('mouseup', () => {
-            if(joystick.id === 'mouse') { joystick.active = false; joystick.id = null; joystick.dx = 0; joystick.dy = 0; }
-        });
-
+        // Touch Control (Fixiert auf linke/rechte Bildschirmhälfte)
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            for(let touch of e.changedTouches) {
-                if(!joystick.active) { 
-                    joystick.active = true; joystick.id = touch.identifier;
-                    joystick.cx = touch.clientX; joystick.cy = touch.clientY;
-                    joystick.nx = touch.clientX; joystick.ny = touch.clientY;
-                    updateJoy();
+            for(let t of e.changedTouches) {
+                if (t.clientX < window.innerWidth / 2 && !joystick.active) {
+                    joystick.active = true; joystick.id = t.identifier;
+                    joystick.nx = t.clientX; joystick.ny = t.clientY;
+                    clampJoy();
+                } else if (t.clientX > window.innerWidth / 2) {
+                    if (Math.hypot(t.clientX - actBase.x, t.clientY - actBase.y) < actBase.r * 2) {
+                        doAction(); // Action Button berührt
+                    }
                 }
             }
         }, {passive: false});
+
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            if(!joystick.active) return;
-            for(let touch of e.changedTouches) {
-                if(touch.identifier === joystick.id) {
-                    joystick.nx = touch.clientX; joystick.ny = touch.clientY;
-                    clampJoy(); updateJoy();
+            for(let t of e.changedTouches) {
+                if(t.identifier === joystick.id) {
+                    joystick.nx = t.clientX; joystick.ny = t.clientY;
+                    clampJoy();
                 }
             }
         }, {passive: false});
+
         function endJoyTouch(e) {
             e.preventDefault();
-            for(let touch of e.changedTouches) {
-                if(touch.identifier === joystick.id) { joystick.active = false; joystick.id = null; joystick.dx = 0; joystick.dy = 0; }
+            for(let t of e.changedTouches) {
+                if(t.identifier === joystick.id) { 
+                    joystick.active = false; joystick.id = null; 
+                    joystick.nx = joyBase.x; joystick.ny = joyBase.y;
+                    joystick.dx = 0; joystick.dy = 0; 
+                }
             }
         }
         canvas.addEventListener('touchend', endJoyTouch, {passive: false});
         canvas.addEventListener('touchcancel', endJoyTouch, {passive: false});
 
         function clampJoy() {
-            const dist = Math.hypot(joystick.nx - joystick.cx, joystick.ny - joystick.cy);
-            if (dist > joystick.maxRadius) {
-                const angle = Math.atan2(joystick.ny - joystick.cy, joystick.nx - joystick.cx);
-                joystick.nx = joystick.cx + Math.cos(angle) * joystick.maxRadius;
-                joystick.ny = joystick.cy + Math.sin(angle) * joystick.maxRadius;
+            const dist = Math.hypot(joystick.nx - joyBase.x, joystick.ny - joyBase.y);
+            if (dist > joyBase.r) {
+                const angle = Math.atan2(joystick.ny - joyBase.y, joystick.nx - joyBase.x);
+                joystick.nx = joyBase.x + Math.cos(angle) * joyBase.r;
+                joystick.ny = joyBase.y + Math.sin(angle) * joyBase.r;
             }
-        }
-
-        function updateJoy() {
-            let dx = joystick.nx - joystick.cx; let dy = joystick.ny - joystick.cy;
-            const dist = Math.hypot(dx, dy);
-            if (dist > 5) { joystick.dx = dx / joystick.maxRadius; joystick.dy = dy / joystick.maxRadius; } 
+            if (dist > 10) { joystick.dx = (joystick.nx - joyBase.x) / joyBase.r; joystick.dy = (joystick.ny - joyBase.y) / joyBase.r; } 
             else { joystick.dx = 0; joystick.dy = 0; }
         }
 
         function getMovementVector() {
             let kx = 0; let ky = 0;
-            if (keys.w || keys.ArrowUp) ky -= 1;
-            if (keys.s || keys.ArrowDown) ky += 1;
-            if (keys.a || keys.ArrowLeft) kx -= 1;
-            if (keys.d || keys.ArrowRight) kx += 1;
+            if (keys.w || keys.arrowup) ky -= 1;
+            if (keys.s || keys.arrowdown) ky += 1;
+            if (keys.a || keys.arrowleft) kx -= 1;
+            if (keys.d || keys.arrowright) kx += 1;
 
             if (kx !== 0 && ky !== 0) { const len = Math.hypot(kx, ky); kx /= len; ky /= len; }
+            return { dx: joystick.active ? joystick.dx : kx, dy: joystick.active ? joystick.dy : ky };
+        }
 
-            return {
-                dx: joystick.active ? joystick.dx : kx,
-                dy: joystick.active ? joystick.dy : ky
-            };
+        // --- 9. GAME ENGINE / ACTIONS ---
+
+        // Konfetti Animation für Basketball (8-Bit Quadrate)
+        function spawnConfetti(cx, cy) {
+            const colors = ['#ff3366', '#00ffcc', '#ffcc00', '#3366ff'];
+            for(let i=0; i<40; i++) {
+                particles.push({
+                    x: cx, y: cy,
+                    vx: (Math.random() - 0.5) * 600, vy: (Math.random() - 1.0) * 600, // Eher nach oben
+                    life: 1.5,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    isConfetti: true
+                });
+            }
+        }
+
+        function doAction() {
+            if (!gameState.isPlaying || !currentRoomId) return;
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            const cx = myLocalPlayer.x + PLAYER_SIZE/2;
+            const cy = myLocalPlayer.y + PLAYER_SIZE/2;
+
+            if (myHeldItem === 'ball') {
+                // Werfen!
+                const tgtX = cx + myFacing.x * 400;
+                const tgtY = cy + myFacing.y * 400;
+                myHeldItem = null;
+                updateDoc(roomRef, {
+                    'ball_owner': null, 'ball_x': tgtX, 'ball_y': tgtY,
+                    'ball_startX': cx, 'ball_startY': cy, 'ball_ts': Date.now()
+                });
+            } else if (myHeldItem && myHeldItem.startsWith('sword')) {
+                // Boss attackieren
+                createParticles(cx + myFacing.x*30, cy + myFacing.y*30, '#ffffff'); // Swing visual
+                if (gameState.boss_active && gameState.boss_hp > 0) {
+                    const distToBoss = Math.hypot(cx - (gameState.boss_x + 40), cy - (gameState.boss_y + 40));
+                    if (distToBoss < 120) {
+                        updateDoc(roomRef, { 'boss_hp': increment(-15) });
+                        createParticles(gameState.boss_x + 40, gameState.boss_y + 40, '#ffcc00'); // Treffer Visual
+                    }
+                }
+            } else {
+                // Item Aufheben (Ball oder Schwert)
+                // 1. Ball Check
+                if (!gameState.ball_owner && Math.hypot(cx - gameState.ball_x, cy - gameState.ball_y) < 80) {
+                    myHeldItem = 'ball';
+                    updateDoc(roomRef, { 'ball_owner': user.uid });
+                    return;
+                }
+                // 2. Schwerter Check
+                for (let i = 1; i <= 4; i++) {
+                    const sKey = 'sword' + i;
+                    const sBase = swordBases[sKey];
+                    if (!gameState[sKey+'_owner'] && Math.hypot(cx - sBase.x, cy - sBase.y) < 80) {
+                        myHeldItem = sKey;
+                        let update = {}; update[sKey+'_owner'] = user.uid;
+                        updateDoc(roomRef, update);
+                        return;
+                    }
+                }
+            }
         }
 
         function checkWall(nx, ny) {
@@ -799,14 +842,11 @@
             for (let obs of obstacles) {
                 if (nx < obs.x + obs.w && nx + PLAYER_SIZE > obs.x && ny < obs.y + obs.h && ny + PLAYER_SIZE > obs.y) return true;
             }
-            for (let t of teachers) {
-                if (nx < t.currentX + PLAYER_SIZE && nx + PLAYER_SIZE > t.currentX && ny < t.currentY + PLAYER_SIZE && ny + PLAYER_SIZE > t.currentY) return true;
-            }
             return false;
         }
 
         function checkStairs(px, py, now) {
-            if (now - lastStairTime < 1000) return; // 1 Sekunde Cooldown
+            if (now - lastStairTime < 1000) return; 
             for (let s of stairs) {
                 if (px < s.x + s.w && px + PLAYER_SIZE > s.x && py < s.y + s.h && py + PLAYER_SIZE > s.y) {
                     myLocalPlayer.y = s.targetY;
@@ -818,7 +858,7 @@
         }
 
         function createParticles(x, y, color) {
-            for(let i=0; i<15; i++) particles.push({ x: x + PLAYER_SIZE/2, y: y + PLAYER_SIZE/2, vx: (Math.random() - 0.5) * 400, vy: (Math.random() - 0.5) * 400, life: 1.0, color: color });
+            for(let i=0; i<10; i++) particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 300, vy: (Math.random() - 0.5) * 300, life: 1.0, color: color });
         }
 
         async function checkTags() {
@@ -831,9 +871,8 @@
                 const p = gameEntities[id] || serverPlayers[id];
                 const cx1 = myLocalPlayer.x + PLAYER_SIZE/2; const cy1 = myLocalPlayer.y + PLAYER_SIZE/2;
                 const cx2 = p.x + PLAYER_SIZE/2; const cy2 = p.y + PLAYER_SIZE/2;
-                const dist = Math.hypot(cx2 - cx1, cy2 - cy1);
-
-                if (dist < PLAYER_SIZE * 0.9) { 
+                
+                if (Math.hypot(cx2 - cx1, cy2 - cy1) < PLAYER_SIZE * 0.9) { 
                     createParticles(p.x, p.y, '#ff3366'); 
                     const timeGained = now - localGabriSince;
                     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
@@ -844,7 +883,7 @@
                             updateDoc(myRef, { timeAsGabri: increment(timeGained) }),
                             updateDoc(roomRef, { currentGabri: id, tagCounter: increment(1) })
                         ]);
-                    } catch(e) { console.error(e); }
+                    } catch(e) {}
                     break;
                 }
             }
@@ -856,11 +895,37 @@
             const now = Date.now();
 
             if (user) {
+                // Host Tasks (Timer & Boss KI)
                 if (gameState.isPlaying && gameState.hostId === user.uid && gameState.timeLeft > 0) {
                     if (now - lastHostTick > 1000) {
                         lastHostTick = now;
+                        let updates = { timeLeft: gameState.timeLeft - 1 };
+                        
+                        // Boss Spawnt bei 60s
+                        if (updates.timeLeft <= 60 && !gameState.boss_active && gameState.boss_hp > 0) {
+                            updates.boss_active = true;
+                        }
+                        
+                        // Boss KI (Verfolgt nächsten Spieler im OG)
+                        if (gameState.boss_active && gameState.boss_hp > 0) {
+                            let nearestId = null; let minDist = 9999;
+                            for (let id in serverPlayers) {
+                                if (serverPlayers[id].y > 2000) {
+                                    let d = Math.hypot(serverPlayers[id].x - gameState.boss_x, serverPlayers[id].y - gameState.boss_y);
+                                    if (d < minDist) { minDist = d; nearestId = id; }
+                                }
+                            }
+                            if (nearestId) {
+                                const target = serverPlayers[nearestId];
+                                const angle = Math.atan2(target.y - gameState.boss_y, target.x - gameState.boss_x);
+                                updates.boss_tx = gameState.boss_x + Math.cos(angle) * 150; // Bewege dich 150px auf Ziel zu
+                                updates.boss_ty = gameState.boss_y + Math.sin(angle) * 150;
+                                updates.boss_x = gameState.boss_tx; // Aktuelle Position fürs nächste Mal setzen
+                            }
+                        }
+
                         const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-                        updateDoc(roomRef, { timeLeft: gameState.timeLeft - 1 }).catch(()=>{});
+                        updateDoc(roomRef, updates).catch(()=>{});
                     }
                 }
 
@@ -870,35 +935,40 @@
                     let mx = move.dx * BASE_SPEED * dt;
                     let my = move.dy * BASE_SPEED * dt;
 
+                    // Facing merken für Werfen
+                    if (Math.abs(move.dx) > 0.1 || Math.abs(move.dy) > 0.1) {
+                        const len = Math.hypot(move.dx, move.dy);
+                        myFacing = { x: move.dx/len, y: move.dy/len };
+                    }
+
                     if (!checkWall(myLocalPlayer.x + mx, myLocalPlayer.y)) myLocalPlayer.x += mx;
                     if (!checkWall(myLocalPlayer.x, myLocalPlayer.y + my)) myLocalPlayer.y += my;
 
-                    // Treppen checken
                     checkStairs(myLocalPlayer.x, myLocalPlayer.y, now);
 
-                    // Kamera Sanft nachziehen
+                    // Boss Kollision (Knockback lokal)
+                    if (gameState.boss_active && gameState.boss_hp > 0 && myLocalPlayer.y > 2000) {
+                        if (Math.hypot(myLocalPlayer.x - gameState.boss_x, myLocalPlayer.y - gameState.boss_y) < 80) {
+                            myLocalPlayer.x -= myFacing.x * 100; // Zurückstoßen
+                            myLocalPlayer.y -= myFacing.y * 100;
+                            createParticles(myLocalPlayer.x, myLocalPlayer.y, '#ff0000');
+                        }
+                    }
+
+                    // Kamera Interpolation
                     const targetCamX = myLocalPlayer.x + PLAYER_SIZE/2 - canvas.width/2;
                     const targetCamY = myLocalPlayer.y + PLAYER_SIZE/2 - canvas.height/2;
                     camera.x += (targetCamX - camera.x) * 10 * dt;
-                    
-                    // Bei Etagen-Wechsel springt die Kamera schneller!
-                    if (Math.abs(targetCamY - camera.y) > 1000) {
-                        camera.y = targetCamY; 
-                    } else {
-                        camera.y += (targetCamY - camera.y) * 10 * dt;
-                    }
+                    if (Math.abs(targetCamY - camera.y) > 1000) camera.y = targetCamY; 
+                    else camera.y += (targetCamY - camera.y) * 10 * dt;
                     
                     camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width));
                     camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
 
                     for(let id in serverPlayers) {
                         if (id !== user.uid && gameEntities[id]) {
-                            // Wenn ein Spieler die Treppe nutzt (schneller Y-Sprung), sofort hinspringen lassen
-                            if (Math.abs(serverPlayers[id].y - gameEntities[id].y) > 1000) {
-                                gameEntities[id].y = serverPlayers[id].y;
-                            } else {
-                                gameEntities[id].y += (serverPlayers[id].y - gameEntities[id].y) * 15 * dt;
-                            }
+                            if (Math.abs(serverPlayers[id].y - gameEntities[id].y) > 1000) gameEntities[id].y = serverPlayers[id].y;
+                            else gameEntities[id].y += (serverPlayers[id].y - gameEntities[id].y) * 15 * dt;
                             gameEntities[id].x += (serverPlayers[id].x - gameEntities[id].x) * 15 * dt;
                         }
                     }
@@ -915,25 +985,15 @@
                     const sec = gameState.timeLeft % 60;
                     document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
                     document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(getTotalGabriTime(user.uid)/1000).toFixed(1)}s`;
-                    
-                    // Update Etagen-Anzeige (Y > 2000 ist OG)
                     floorDisplay.innerText = myLocalPlayer.y > 2000 ? "OBERGESCHOSS (OG)" : "ERDGESCHOSS (EG)";
                 
                     render(dt, now);
                 }
             }
-
             requestAnimationFrame(gameLoop);
         }
 
         function render(dt, nowTime) {
-            teachers.forEach(t => {
-                const offset = Math.sin(nowTime * t.speed);
-                t.currentX = t.startX + t.moveX * offset;
-                t.currentY = t.startY + t.moveY * offset;
-            });
-
-            // Hintergrundfarbe ändert sich leicht je nach Etage für bessere Orientierung
             const isInOG = camera.y > 1500;
             ctx.fillStyle = isInOG ? '#0b111a' : '#0d0d12'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -942,101 +1002,128 @@
             ctx.translate(-camera.x, -camera.y);
 
             // Gitterboden
-            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 2;
             const gridSize = 100;
-            const startX = Math.floor(camera.x / gridSize) * gridSize;
-            const startY = Math.floor(camera.y / gridSize) * gridSize;
+            const startX = Math.floor(camera.x / gridSize) * gridSize; const startY = Math.floor(camera.y / gridSize) * gridSize;
             ctx.beginPath();
             for(let x = startX; x < camera.x + canvas.width; x += gridSize) if(x >= 0 && x <= MAP_WIDTH) { ctx.moveTo(x, 0); ctx.lineTo(x, MAP_HEIGHT); }
             for(let y = startY; y < camera.y + canvas.height; y += gridSize) if(y >= 0 && y <= MAP_HEIGHT) { ctx.moveTo(0, y); ctx.lineTo(MAP_WIDTH, y); }
             ctx.stroke();
 
-            // Treppen zeichnen (Auffällig)
+            // Treppen
             for(let s of stairs) {
-                // Nur Treppen auf der aktuellen Etage zeichnen
                 if ((isInOG && s.y < 2000) || (!isInOG && s.y > 2000)) continue;
-                
-                ctx.fillStyle = '#222';
-                ctx.fillRect(s.x, s.y, s.w, s.h);
-                ctx.strokeStyle = '#ffcc00'; // Auffälliges Gelb für Treppen
-                ctx.lineWidth = 4;
-                ctx.strokeRect(s.x, s.y, s.w, s.h);
-                
+                ctx.fillStyle = '#222'; ctx.fillRect(s.x, s.y, s.w, s.h);
+                ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 4; ctx.strokeRect(s.x, s.y, s.w, s.h);
                 ctx.beginPath();
-                for(let i=0; i<10; i++) {
-                    ctx.moveTo(s.x, s.y + (i * s.h/10));
-                    ctx.lineTo(s.x + s.w, s.y + (i * s.h/10));
-                }
+                for(let i=0; i<10; i++) { ctx.moveTo(s.x, s.y + (i * s.h/10)); ctx.lineTo(s.x + s.w, s.y + (i * s.h/10)); }
                 ctx.stroke();
-                
-                ctx.fillStyle = '#ffcc00'; 
-                ctx.font = '14px "Press Start 2P"'; 
-                ctx.textAlign = 'center'; 
-                ctx.textBaseline = 'middle';
-                // Dunkler Hintergrund für den Text
-                ctx.fillStyle = 'rgba(0,0,0,0.7)';
-                ctx.fillRect(s.x, s.y + s.h/2 - 15, s.w, 30);
-                ctx.fillStyle = '#ffcc00';
+                ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(s.x, s.y + s.h/2 - 15, s.w, 30);
+                ctx.fillStyle = '#ffcc00'; ctx.font = '14px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText(s.label, s.x + s.w/2, s.y + s.h/2);
             }
 
-            // Hindernisse, Räume, Tische, Stühle
+            // Gebäude / Interieur
             for(let obs of obstacles) {
-                // Viewport Culling: Zeichne nur das, was auf dem Bildschirm ist (+ Puffer)
-                if (obs.x + (obs.w||0) < camera.x - 200 || obs.x > camera.x + canvas.width + 200 ||
-                    obs.y + (obs.h||0) < camera.y - 200 || obs.y > camera.y + canvas.height + 200) continue;
+                if (obs.x + (obs.w||0) < camera.x - 200 || obs.x > camera.x + canvas.width + 200 || obs.y + (obs.h||0) < camera.y - 200 || obs.y > camera.y + canvas.height + 200) continue;
 
                 if (obs.isWall) {
-                    ctx.fillStyle = '#1a1a24';
-                    ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-                    ctx.strokeStyle = 'rgba(0, 255, 204, 0.4)'; 
-                    ctx.lineWidth = 2; 
-                    ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+                    ctx.fillStyle = '#1a1a24'; ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                    ctx.strokeStyle = 'rgba(0, 255, 204, 0.4)'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
                 } else if (obs.isTable) {
-                    ctx.fillStyle = '#5D4037'; // Holztisch
-                    ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-                    ctx.strokeStyle = '#3E2723';
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(obs.x+1, obs.y+1, obs.w-2, obs.h-2);
+                    ctx.fillStyle = '#5D4037'; ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                    ctx.strokeStyle = '#3E2723'; ctx.lineWidth = 3; ctx.strokeRect(obs.x+1, obs.y+1, obs.w-2, obs.h-2);
                 } else if (obs.isChair) {
-                    ctx.fillStyle = '#4E342E'; // Stuhlfläche
-                    ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-                    ctx.fillStyle = '#3E2723'; // Rückenlehne (dunkler)
-                    if (obs.dir === 'up') ctx.fillRect(obs.x, obs.y, obs.w, 5);
-                    else ctx.fillRect(obs.x, obs.y + obs.h - 5, obs.w, 5);
+                    ctx.fillStyle = '#4E342E'; ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                    ctx.fillStyle = '#3E2723';
+                    if (obs.dir === 'up') ctx.fillRect(obs.x, obs.y, obs.w, 5); else ctx.fillRect(obs.x, obs.y + obs.h - 5, obs.w, 5);
                 }
             }
 
-            // Raum Beschriftungen
+            // Basketballkorb (Turnhalle)
+            if (!isInOG) {
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(hoop.x, hoop.y - 10, hoop.w, 10); // Backboard
+                ctx.strokeStyle = '#ff6600'; ctx.lineWidth = 4; ctx.beginPath();
+                ctx.arc(hoop.x + hoop.w/2, hoop.y + 10, 20, 0, Math.PI*2); ctx.stroke(); // Ring
+            }
+
             for(let l of labels) {
                 if (l.x < camera.x - 200 || l.x > camera.x + canvas.width + 200 || l.y < camera.y - 200 || l.y > camera.y + canvas.height + 200) continue;
-                ctx.fillStyle = 'rgba(255,255,255,0.1)'; 
-                ctx.font = 'bold 36px "Outfit"'; 
-                ctx.textAlign = 'center'; 
-                ctx.textBaseline = 'middle';
-                ctx.fillText(l.text, l.x, l.y);
+                ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.font = 'bold 36px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(l.text, l.x, l.y);
             }
 
+            // Schwerter am Boden (OG)
+            if (isInOG) {
+                for(let i=1; i<=4; i++) {
+                    let sKey = 'sword'+i;
+                    if (!gameState[sKey+'_owner']) {
+                        let sx = swordBases[sKey].x; let sy = swordBases[sKey].y;
+                        ctx.fillStyle = '#aaaaaa'; ctx.fillRect(sx, sy, 4, 20); // Klinge
+                        ctx.fillStyle = '#ffcc00'; ctx.fillRect(sx-4, sy+15, 12, 4); // Parierstange
+                    }
+                }
+            }
+
+            // Boss Rendern (OG)
+            if (isInOG && gameState.boss_active && gameState.boss_hp > 0) {
+                let bx = gameState.boss_x; let by = gameState.boss_y;
+                // Interpolation für geschmeidiges Bewegen des Bosses
+                if (gameEntities['boss']) {
+                    gameEntities['boss'].x += (gameState.boss_tx - gameEntities['boss'].x) * 5 * dt;
+                    gameEntities['boss'].y += (gameState.boss_ty - gameEntities['boss'].y) * 5 * dt;
+                    bx = gameEntities['boss'].x; by = gameEntities['boss'].y;
+                } else { gameEntities['boss'] = {x: bx, y: by}; }
+
+                ctx.imageSmoothingEnabled = false;
+                let bFrame = Math.floor(nowTime / 250) % 2;
+                ctx.drawImage(texBoss[bFrame], bx, by, 80, 80); // Boss ist doppelt so groß!
+                
+                // Boss HP Bar & Name
+                ctx.fillStyle = '#ff0000'; ctx.fillRect(bx, by - 20, 80, 8);
+                ctx.fillStyle = '#00ffcc'; ctx.fillRect(bx, by - 20, 80 * (gameState.boss_hp/100), 8);
+                ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px "Outfit"'; ctx.textAlign = 'center';
+                ctx.fillText("ISHIN", bx + 40, by - 30);
+            }
+
+            // Ball Rendern
+            let drawBallX = gameState.ball_x; let drawBallY = gameState.ball_y; let drawBallZ = 0;
+            if (gameState.ball_owner) {
+                // Ball ist beim Besitzer
+                const owner = serverPlayers[gameState.ball_owner] || (gameState.ball_owner === user.uid ? myLocalPlayer : null);
+                if (owner) { drawBallX = owner.x + 20; drawBallY = owner.y + 20; }
+            } else if (nowTime - gameState.ball_ts < 800) {
+                // Ball fliegt! (800ms Flugzeit)
+                const p = (nowTime - gameState.ball_ts) / 800;
+                drawBallX = gameState.ball_startX + (gameState.ball_x - gameState.ball_startX) * p;
+                drawBallY = gameState.ball_startY + (gameState.ball_y - gameState.ball_startY) * p;
+                drawBallZ = Math.sin(p * Math.PI) * 150; // Parabel-Höhe
+                
+                // Konfetti Check am Ende des Flugs
+                if (p > 0.9 && gameState.ball_ts !== lastConfettiTs) {
+                    if (Math.hypot(drawBallX - (hoop.x + hoop.w/2), drawBallY - (hoop.y + 10)) < 50) {
+                        spawnConfetti(hoop.x + hoop.w/2, hoop.y + 10);
+                    }
+                    lastConfettiTs = gameState.ball_ts;
+                }
+            }
+            // Ball zeichnen, wenn er auf unserer Etage ist
+            if ((isInOG && drawBallY > 2000) || (!isInOG && drawBallY < 2000)) {
+                ctx.fillStyle = '#ff6600';
+                ctx.beginPath(); ctx.arc(drawBallX, drawBallY - drawBallZ, 12, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+            }
+
+            // Partikel (Konfetti, Hits)
             for(let i=particles.length-1; i>=0; i--) {
                 let p = particles[i];
-                p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 2;
+                p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+                if(p.isConfetti) p.vy += 400 * dt; // Gravitation für Konfetti
                 if(p.life <= 0) { particles.splice(i, 1); continue; }
-                ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 8, 8); ctx.globalAlpha = 1.0;
+                ctx.fillStyle = p.color; ctx.globalAlpha = p.life; 
+                ctx.fillRect(p.x, p.y, 8, 8); ctx.globalAlpha = 1.0;
             }
 
-            for(let t of teachers) {
-                // Lehrer nur zeichnen, wenn sie auf derselben Etage sind
-                if ((isInOG && t.currentY < 2000) || (!isInOG && t.currentY > 2000)) continue;
-
-                ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(texTeacher, t.currentX, t.currentY, PLAYER_SIZE, PLAYER_SIZE); ctx.shadowBlur = 0;
-                ctx.fillStyle = '#aaaaaa'; ctx.font = '600 12px "Outfit"'; ctx.textAlign = 'center';
-                const textWidth = ctx.measureText(t.name).width;
-                ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(t.currentX + PLAYER_SIZE/2 - textWidth/2 - 4, t.currentY - 24, textWidth + 8, 18);
-                ctx.fillStyle = '#cccccc'; ctx.fillText(t.name, t.currentX + PLAYER_SIZE/2, t.currentY - 10);
-            }
-
+            // Spieler rendern
             for(let id in serverPlayers) {
                 const sp = serverPlayers[id];
                 const isMe = (id === user?.uid);
@@ -1045,24 +1132,34 @@
                 let px = isMe ? myLocalPlayer.x : (gameEntities[id]?.x || sp.x);
                 let py = isMe ? myLocalPlayer.y : (gameEntities[id]?.y || sp.y);
 
-                // Andere Spieler nur zeichnen, wenn sie auf MEINER Etage sind (Y über oder unter 2000)
                 if (!isMe && ((isInOG && py < 2000) || (!isInOG && py > 2000))) continue;
 
-                if (isGabri) {
-                    ctx.shadowColor = '#ff3366'; ctx.shadowBlur = 20 + Math.abs(Math.sin(nowTime * 0.005)) * 10;
-                } else {
-                    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10;
-                }
+                if (isGabri) { ctx.shadowColor = '#ff3366'; ctx.shadowBlur = 20 + Math.abs(Math.sin(nowTime * 0.005)) * 10; } 
+                else { ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; }
 
                 ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(isGabri ? texGabri : texNormal, px, py, PLAYER_SIZE, PLAYER_SIZE);
+                
+                // Einfache Lauf-Animation: Wackelt, wenn sich Koordinaten ändern
+                let isMoving = isMe ? (Math.abs(getMovementVector().dx) > 0 || Math.abs(getMovementVector().dy) > 0) : (Math.hypot(sp.x - px, sp.y - py) > 5);
+                let frame = isMoving ? Math.floor(nowTime / 150) % 2 : 0;
+                
+                ctx.drawImage(isGabri ? texGabri[frame] : texNormal[frame], px, py, PLAYER_SIZE, PLAYER_SIZE);
                 ctx.shadowBlur = 0; 
+
+                // Hält dieser Spieler ein Schwert?
+                let playerHeldItem = null;
+                if (isMe) playerHeldItem = myHeldItem;
+                else {
+                    for(let i=1; i<=4; i++) if (gameState['sword'+i+'_owner'] === id) playerHeldItem = 'sword';
+                }
+                if (playerHeldItem && playerHeldItem.startsWith('sword')) {
+                    ctx.fillStyle = '#aaaaaa'; ctx.fillRect(px + 30, py + 10, 4, 25);
+                }
 
                 if (isGabri && nowTime < localGabriSince + TAG_COOLDOWN_MS) {
                     const progress = (nowTime - localGabriSince) / TAG_COOLDOWN_MS;
                     ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 3; ctx.beginPath();
-                    ctx.arc(px + PLAYER_SIZE/2, py + PLAYER_SIZE/2, PLAYER_SIZE*0.8, -Math.PI/2, (-Math.PI/2) + (Math.PI*2*progress));
-                    ctx.stroke();
+                    ctx.arc(px + PLAYER_SIZE/2, py + PLAYER_SIZE/2, PLAYER_SIZE*0.8, -Math.PI/2, (-Math.PI/2) + (Math.PI*2*progress)); ctx.stroke();
                 }
 
                 ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
@@ -1075,14 +1172,20 @@
 
             ctx.restore(); 
 
-            if (joystick.active) {
-                ctx.save();
-                ctx.beginPath(); ctx.arc(joystick.cx, joystick.cy, joystick.maxRadius, 0, Math.PI*2);
-                ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
-                ctx.beginPath(); ctx.arc(joystick.nx, joystick.ny, 25, 0, Math.PI*2);
-                ctx.fillStyle = 'rgba(0, 255, 204, 0.4)'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 15; ctx.fill();
-                ctx.restore();
-            }
+            // FESTE JOYSTICKS AUF DEM BILDSCHIRM
+            ctx.save();
+            // Bewegungs-Joystick (Links)
+            ctx.beginPath(); ctx.arc(joyBase.x, joyBase.y, joyBase.r, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(joystick.nx, joystick.ny, 25, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(0, 255, 204, 0.4)'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 15; ctx.fill();
+            
+            // Aktions-Button (Rechts)
+            ctx.beginPath(); ctx.arc(actBase.x, actBase.y, actBase.r, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(255,51,102,0.2)'; ctx.strokeStyle = 'rgba(255,51,102,0.4)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
+            ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = 'bold 12px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText("AKTION", actBase.x, actBase.y);
+            ctx.restore();
         }
     </script>
 </body>
