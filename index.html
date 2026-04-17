@@ -16,8 +16,6 @@
         :root {
             --primary: #00ffcc;
             --gabri: #ff3366;
-            --glass-bg: rgba(15, 15, 20, 0.85);
-            --glass-border: rgba(0, 255, 204, 0.2);
         }
 
         * { 
@@ -40,535 +38,186 @@
             overscroll-behavior: none; 
         }
 
-        /* ------------------------------------------- */
-        /* CRT Scanline & Vignette Effect              */
-        /* ------------------------------------------- */
+        /* CRT Effect */
         .crt-overlay {
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100vw; 
-            height: 100vh;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 4px, 3px 100%; 
-            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
-            z-index: 100; 
-            pointer-events: none; 
-            opacity: 0.7; 
-            mix-blend-mode: overlay;
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%; box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
+            z-index: 100; pointer-events: none; opacity: 0.5; mix-blend-mode: overlay;
         }
 
         canvas { 
-            display: block; 
-            width: 100vw; 
-            height: 100vh; 
-            opacity: 0; 
-            transition: opacity 0.8s ease-in; 
-            image-rendering: pixelated; 
-        }
-        
-        .game-running canvas { 
-            opacity: 1; 
+            display: block; width: 100vw; height: 100vh; image-rendering: pixelated; 
         }
 
-        /* ------------------------------------------- */
-        /* UI Panels & Modals                          */
-        /* ------------------------------------------- */
-        .glass-panel {
-            background: var(--glass-bg); 
-            backdrop-filter: blur(20px); 
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border); 
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(0,255,204,0.05); 
-            border-radius: 16px;
+        /* .io Style Login Screen */
+        #login-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: radial-gradient(circle at center, #1a1a24 0%, #050508 100%);
+            z-index: 50; transition: opacity 0.5s ease;
+        }
+        
+        .login-box {
+            background: rgba(15, 15, 20, 0.9); border: 2px solid rgba(0, 255, 204, 0.3);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(0,255,204,0.05);
+            padding: 40px; border-radius: 20px; width: 100%; max-width: 450px;
+            display: flex; flex-direction: column; gap: 20px;
         }
 
-        #ui-layer {
-            position: absolute; 
-            top: 0; left: 0; right: 0; bottom: 0; 
-            pointer-events: none;
-            display: flex; 
-            flex-direction: column; 
-            justify-content: space-between; 
-            padding: env(safe-area-inset-top, 20px) 20px 20px 20px; 
-            z-index: 10;
+        h1 { font-family: 'Press Start 2P', cursive; text-align: center; color: white; text-shadow: 0 4px 15px var(--primary); font-size: 32px; margin: 0; line-height: 1.4; }
+        
+        .input-io {
+            width: 100%; background: rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.1);
+            color: var(--primary); padding: 18px; border-radius: 12px; font-size: 20px; font-weight: 800;
+            text-align: center; outline: none; transition: all 0.3s;
+        }
+        .input-io:focus { border-color: var(--primary); box-shadow: 0 0 25px rgba(0,255,204,0.4); transform: scale(1.02); }
+
+        select.input-io { appearance: none; cursor: pointer; color: white; }
+
+        .btn-play {
+            width: 100%; background: linear-gradient(135deg, #00ffcc 0%, #00997a 100%);
+            color: #000; font-weight: 800; font-size: 22px; padding: 20px; border-radius: 12px;
+            border: none; cursor: pointer; transition: all 0.2s; text-transform: uppercase; box-shadow: 0 6px 20px rgba(0, 255, 204, 0.4);
+        }
+        .btn-play:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0, 255, 204, 0.6); }
+        .btn-play:active { transform: scale(0.95); }
+        .btn-play:disabled { opacity: 0.5; filter: grayscale(1); cursor: not-allowed; transform: none; }
+
+        /* Game HUD */
+        #game-hud {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;
+            display: none; padding: 20px;
         }
 
-        #screens-layer {
-            position: absolute; 
-            top: 0; left: 0; right: 0; bottom: 0; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            background: radial-gradient(circle at center, #1a1a24 0%, #050508 100%); 
-            z-index: 50; 
-            transition: opacity 0.4s ease, transform 0.4s ease;
-        }
-
-        .screen { 
-            display: none; 
-            width: 100%; 
-            max-width: 480px; 
-            padding: 30px; 
-            pointer-events: auto; 
-        }
+        .hud-top { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; pointer-events: auto; }
         
-        .screen.active { 
-            display: block; 
-            animation: screenPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+        .leaderboard-box {
+            background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; width: 250px;
         }
+        .leaderboard-title { color: var(--primary); font-size: 14px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+        .lb-row { display: flex; justify-content: space-between; color: white; font-size: 14px; margin-bottom: 5px; font-weight: 600;}
         
-        @keyframes screenPop { 
-            0% { opacity: 0; transform: scale(0.9) translateY(20px); } 
-            100% { opacity: 1; transform: scale(1) translateY(0); } 
+        .status-box {
+            background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 15px; text-align: center;
         }
-
-        h1 { 
-            font-family: 'Press Start 2P', cursive; 
-            text-align: center; 
-            color: white; 
-            text-shadow: 0 4px 15px var(--primary); 
-            font-size: 28px; 
-            margin-bottom: 10px; 
-            line-height: 1.4; 
+        .timer { font-family: 'Press Start 2P', cursive; font-size: 24px; color: var(--primary); margin-bottom: 5px; text-shadow: 0 0 10px var(--primary); }
+        .room-name { color: #888; font-size: 12px; font-weight: bold; }
+        .btn-start-round {
+            background: var(--primary); color: black; border: none; padding: 10px 15px; font-weight: bold; border-radius: 8px; margin-top: 10px; cursor: pointer; width: 100%;
         }
-        
-        .input-elite {
-            width: 100%; 
-            background: rgba(0,0,0,0.8); 
-            border: 2px solid rgba(255,255,255,0.1); 
-            color: var(--primary); 
-            padding: 18px; 
-            border-radius: 12px;
-            font-size: 22px; 
-            font-weight: 800; 
-            text-align: center; 
-            outline: none; 
-            transition: all 0.3s; 
-            letter-spacing: 2px;
-        }
-        
-        .input-elite:focus { 
-            border-color: var(--primary); 
-            box-shadow: 0 0 25px rgba(0,255,204,0.4); 
-            transform: scale(1.02); 
-        }
-
-        .btn-elite {
-            width: 100%; 
-            background: linear-gradient(135deg, #00ffcc 0%, #00997a 100%); 
-            color: #000; 
-            font-weight: 800; 
-            font-size: 18px; 
-            padding: 18px; 
-            border-radius: 12px;
-            border: none; 
-            cursor: pointer; 
-            margin-top: 15px; 
-            transition: all 0.2s; 
-            pointer-events: auto; 
-            text-transform: uppercase; 
-            box-shadow: 0 6px 20px rgba(0, 255, 204, 0.4); 
-            letter-spacing: 1px;
-        }
-        
-        .btn-elite:hover { 
-            transform: translateY(-2px); 
-            box-shadow: 0 8px 25px rgba(0, 255, 204, 0.6); 
-        }
-        
-        .btn-elite:active { 
-            transform: scale(0.95); 
-            box-shadow: 0 2px 10px rgba(0, 255, 204, 0.3); 
-        }
-        
-        .btn-elite:disabled { 
-            opacity: 0.5; 
-            filter: grayscale(1); 
-            cursor: not-allowed; 
-            transform: none; 
-            box-shadow: none; 
-        }
-        
-        .btn-danger { 
-            background: linear-gradient(135deg, #ff3366 0%, #990033 100%); 
-            color: white; 
-            box-shadow: 0 6px 20px rgba(255, 51, 102, 0.4); 
-        }
-
-        /* ------------------------------------------- */
-        /* Room Selection Styles                       */
-        /* ------------------------------------------- */
-        .room-list { 
-            display: grid; 
-            grid-template-columns: 1fr; 
-            gap: 12px; 
-            margin-top: 25px; 
-        }
-        
-        .room-btn { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            width: 100%; 
-            padding: 18px 20px; 
-            background: rgba(10,10,15,0.9); 
-            border: 2px solid rgba(0,255,204,0.2); 
-            color: white; 
-            border-radius: 12px; 
-            font-weight: 800; 
-            font-size: 16px; 
-            cursor: pointer; 
-            transition: all 0.2s;
-        }
-        
-        .room-btn:hover { 
-            border-color: var(--primary); 
-            background: rgba(0,255,204,0.1); 
-            transform: translateX(5px); 
-        }
-        
-        .room-count { 
-            background: var(--primary); 
-            color: #000; 
-            padding: 4px 10px; 
-            border-radius: 20px; 
-            font-size: 12px; 
-            font-weight: 800; 
-        }
-
-        /* ------------------------------------------- */
-        /* In-Game HUD                                 */
-        /* ------------------------------------------- */
-        .hud-header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: flex-start; 
-            pointer-events: auto; 
-        }
-        
-        .hud-box { 
-            padding: 15px 25px; 
-            border-radius: 14px; 
-            color: white; 
-            background: rgba(10, 10, 15, 0.9); 
-            border: 1px solid rgba(255,255,255,0.1); 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
-        }
-        
-        .timer-text { 
-            font-family: 'Press Start 2P', cursive; 
-            font-size: 22px; 
-            color: var(--primary); 
-            text-shadow: 0 0 15px var(--primary); 
-        }
-        
-        .status-text { 
-            font-size: 16px; 
-            font-weight: 800; 
-            text-align: right; 
-            text-transform: uppercase; 
-            letter-spacing: 1px;
-        }
-        
-        .is-gabri-alert { 
-            animation: pulse-gabri 0.8s infinite alternate; 
-            color: var(--gabri) !important; 
-            border-color: var(--gabri); 
-        }
-        
-        @keyframes pulse-gabri { 
-            from { box-shadow: 0 0 10px rgba(255,51,102,0.3); } 
-            to { box-shadow: 0 0 30px rgba(255,51,102,0.8), inset 0 0 15px rgba(255,51,102,0.4); } 
-        }
-
-        /* ------------------------------------------- */
-        /* Player List & Leaderboard                   */
-        /* ------------------------------------------- */
-        .player-list { 
-            max-height: 250px; 
-            overflow-y: auto; 
-            margin-bottom: 20px; 
-            pointer-events: auto; 
-            background: rgba(0,0,0,0.6); 
-            border-radius: 12px; 
-            border: 1px solid rgba(255,255,255,0.05); 
-        }
-        
-        .player-item { 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            padding: 14px; 
-            border-bottom: 1px solid rgba(255,255,255,0.05); 
-            color: #fff; 
-            font-weight: 600;
-        }
-        
-        .player-item:last-child { border: none; }
-        
-        .status-dot { 
-            width: 12px; 
-            height: 12px; 
-            border-radius: 50%; 
-            background: #00ffcc; 
-            box-shadow: 0 0 12px #00ffcc; 
-        }
-        
-        .host-crown { margin-left: 8px; font-size: 16px; }
-
-        .rank-row {
-            display: flex; 
-            justify-content: space-between; 
-            padding: 14px;
-            background: rgba(255,255,255,0.05); 
-            margin-bottom: 8px; 
-            border-radius: 10px;
-            font-weight: 600; 
-            color: white; 
-            font-size: 16px;
-        }
-        
-        .rank-loser { background: rgba(255, 51, 102, 0.2); border: 1px solid var(--gabri); color: #ff99aa;}
-        .rank-winner { background: rgba(0, 255, 204, 0.1); border: 1px solid var(--primary); color: var(--primary);}
 
         #floorDisplay {
-            position: absolute; 
-            bottom: 30px; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            background: rgba(10,10,15,0.95); 
-            border: 2px solid var(--primary); 
-            color: var(--primary);
-            padding: 12px 24px; 
-            border-radius: 30px; 
-            font-family: 'Press Start 2P', cursive; 
-            font-size: 12px; 
-            text-shadow: 0 0 8px var(--primary); 
-            box-shadow: 0 0 20px rgba(0,255,204,0.4); 
-            pointer-events: none; 
-            display: none;
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(10,10,15,0.95); border: 2px solid var(--primary); color: var(--primary);
+            padding: 12px 24px; border-radius: 30px; font-family: 'Press Start 2P', cursive; font-size: 12px; text-shadow: 0 0 8px var(--primary); box-shadow: 0 0 20px rgba(0,255,204,0.4); pointer-events: none;
         }
-        
-        .game-running #floorDisplay { display: block; }
-        
-        ::-webkit-scrollbar { width: 8px; } 
-        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; } 
-        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
     </style>
 </head>
 <body>
     <div class="crt-overlay"></div>
 
-    <script>
-        // PWA Manifest Injector 
-        const manifestJSON = {
-            name: "Gabri-Flucht.io",
-            short_name: "Gabri.io",
-            start_url: location.href,
-            display: "fullscreen",
-            background_color: "#0d0d12",
-            theme_color: "#00ffcc",
-            icons: [{
-                src: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzBkMGQxMiIvPjx0ZXh0IHg9IjUwIiB5PSI2NCIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2xkIiBmb250LXNpemU9IjUwIiBmaWxsPSIjMDBmZmNjIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5HPC90ZXh0Pjwvc3ZnPg==",
-                sizes: "512x512",
-                type: "image/svg+xml"
-            }]
-        };
-        const manifestBlob = new Blob([JSON.stringify(manifestJSON)], {type: "application/json"});
-        document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${URL.createObjectURL(manifestBlob)}">`);
-    </script>
-
-    <!-- Canvas for Game Rendering -->
-    <canvas id="gameCanvas"></canvas>
-    
-    <!-- UI Overlay for Floor Indicator -->
-    <div id="floorDisplay">EG</div>
-
-    <!-- UI Overlay for In-Game HUD -->
-    <div id="ui-layer" style="display: none;">
-        <div class="hud-header">
-            <div class="hud-box" id="hudTimerBox">
-                <div class="timer-text" id="timerDisplay">03:00</div>
-            </div>
-            <div class="hud-box" id="hudStatusBox">
-                <div class="status-text" id="roleDisplay">Lade...</div>
-                <div class="text-sm text-gray-400 mt-1 font-semibold" id="myTimeDisplay">Zeit als Gabri: 0.0s</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Screens Layer (Menus) -->
-    <div id="screens-layer">
-        
-        <!-- 1. LOGIN SCREEN -->
-        <div id="screen-login" class="screen glass-panel active">
-            <h1>GABRI<br><span style="color:white; font-size: 14px; letter-spacing: 4px;">FLUCHT</span></h1>
-            <p class="text-gray-300 text-center mb-4 text-sm font-semibold leading-relaxed">
-                Willkommen zur 2026 Elite Edition.<br>
-                <span class="text-xs text-primary font-normal mt-2 block bg-gray-900 p-3 rounded-lg border border-gray-700">
-                    A/Space = Aktion / Schlagen<br>
-                    B/Shift = Ausweich-Dash<br>
-                    C/Y = Item Fallenlassen
-                </span>
-            </p>
+    <!-- MAIN MENU (.IO STYLE) -->
+    <div id="login-screen">
+        <div class="login-box">
+            <h1>GABRI<span style="color:var(--primary)">.IO</span></h1>
             
-            <!-- SERVER STATUS UI (BUGFIX: Zuverlässiges Feedback anstelle von Endlos-Laden) -->
-            <div id="serverStatus" class="text-xs text-green-400 text-center mb-3 font-bold bg-gray-900 p-2 rounded border border-green-900 transition-all">
-                📡 BEREIT ZUR VERBINDUNG
-            </div>
-
-            <input type="text" id="playerNameInput" class="input-elite" placeholder="DEIN NAME" maxlength="12" autocomplete="off">
-            <!-- BUGFIX: Der Button ist NICHT mehr standardmäßig auf disabled! -->
-            <button id="btnJoin" class="btn-elite">SYSTEM STARTEN</button>
-        </div>
-
-        <!-- 2. SERVER BROWSER -->
-        <div id="screen-room" class="screen glass-panel">
-            <h2 class="text-2xl font-bold text-center text-white mb-2">SERVER PROTOKOLL</h2>
-            <p class="text-gray-300 text-center mb-4 text-sm">Wähle eine gesicherte Instanz.</p>
-            <div id="room-list" class="room-list">
-                <button class="room-btn" data-room="GABRI RAUM">
-                    GABRI RAUM <span class="room-count" id="count-GABRI RAUM">0/10</span>
-                </button>
-                <button class="room-btn" data-room="RAUM DES GABRIS">
-                    RAUM DES GABRIS <span class="room-count" id="count-RAUM DES GABRIS">0/10</span>
-                </button>
-                <button class="room-btn" data-room="GABRILOGIE">
-                    GABRILOGIE <span class="room-count" id="count-GABRILOGIE">0/10</span>
-                </button>
-                <button class="room-btn" data-room="GABRIELS">
-                    GABRIELS <span class="room-count" id="count-GABRIELS">0/10</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- 3. LOBBY SCREEN -->
-        <div id="screen-lobby" class="screen glass-panel">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-primary m-0" id="lobbyTitleCode">LOBBY</h2>
-                <div class="text-xs bg-gray-800 px-3 py-1 rounded text-white border border-gray-600" id="lobbyPing">
-                    Verbunden
+            <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; text-align: center;">
+                <span class="text-xs text-gray-400 font-bold block mb-2">STEUERUNG</span>
+                <div class="flex justify-center gap-4 text-sm text-white font-semibold">
+                    <span>🕹️ WASD</span>
+                    <span>⚔️ SPACE (Aktion)</span>
+                    <span>💨 SHIFT (Dash)</span>
+                    <span>🗑️ C (Drop Item)</span>
                 </div>
             </div>
-            <p class="text-center text-gray-400 text-sm mb-4 bg-gray-900 p-2 rounded border border-gray-700">
-                Stehe 2 Sek still, um dich zu verstecken.<br>Lass Items mit 'C' fallen.
-            </p>
-            <div class="player-list p-2" id="lobbyPlayerList"></div>
-            
-            <!-- Host Controls -->
-            <div id="hostControls" style="display: none;">
-                <button id="btnStartGame" class="btn-elite">RUNDE STARTEN</button>
-            </div>
-            
-            <!-- Client Controls -->
-            <div id="clientControls">
-                <button class="btn-elite" disabled style="background: #333; color: #888; border-color: #555;">
-                    WARTE AUF HOST...
-                </button>
-            </div>
-        </div>
 
-        <!-- 4. LEADERBOARD SCREEN -->
-        <div id="screen-leaderboard" class="screen glass-panel">
-            <h2 class="text-2xl font-bold text-center mb-1 text-white">SYSTEM OFFLINE</h2>
-            <p class="text-center text-red-400 text-sm mb-6 font-semibold">Wer am längsten Gabri war, verliert.</p>
-            <div id="leaderboardList" class="mb-6 max-h-[250px] overflow-y-auto pointer-events-auto bg-black p-3 rounded-lg border border-gray-800"></div>
-            <button id="btnRestart" class="btn-elite btn-danger">NEUE VERBINDUNG (LOBBY)</button>
+            <div id="errorBox" class="hidden text-xs text-red-400 text-center font-bold bg-red-900 bg-opacity-30 p-3 rounded border border-red-800"></div>
+
+            <input type="text" id="inputName" class="input-io" placeholder="DEIN NAME" maxlength="12" autocomplete="off">
+            
+            <select id="inputRoom" class="input-io">
+                <option value="GABRI RAUM">Raum 1: GABRI RAUM</option>
+                <option value="RAUM DES GABRIS">Raum 2: RAUM DES GABRIS</option>
+                <option value="GABRILOGIE">Raum 3: GABRILOGIE</option>
+                <option value="GABRIELS">Raum 4: GABRIELS</option>
+            </select>
+
+            <button id="btnPlay" class="btn-play">SPIELEN</button>
         </div>
     </div>
 
-    <!-- ============================================================================ -->
-    <!-- CORE ENGINE SCRIPT (2026 ARCHITECTURE)                                       -->
-    <!-- ============================================================================ -->
+    <!-- GAME CANVAS -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- GAME HUD -->
+    <div id="game-hud">
+        <div class="hud-top">
+            <div class="leaderboard-box">
+                <div class="leaderboard-title">SPIELER (Zeit als Gabri)</div>
+                <div id="lb-content"></div>
+            </div>
+            
+            <div class="status-box">
+                <div id="gameTimer" class="timer">WARMUP</div>
+                <div id="gameRole" class="text-white font-bold text-lg mb-1">Erkunde die Map</div>
+                <div id="currentRoomDisplay" class="room-name">GABRI RAUM</div>
+                <button id="btnStartRound" class="btn-start-round">RUNDE STARTEN</button>
+            </div>
+        </div>
+        <div id="floorDisplay">EG</div>
+    </div>
+
+    <!-- FIREBASE & ENGINE SCRIPT -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ----------------------------------------------------------------------
-        // 1. FIREBASE CONFIGURATION (ENTERPRISE STANDARD)
-        // ----------------------------------------------------------------------
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-2026-core';
-        
-        const FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "AIzaSyDWM2Dnq72MeWuZcV3uT4YXg0G9nyZIVAc", 
-            authDomain: "gabri-4f94c.firebaseapp.com",
-            projectId: "gabri-4f94c", 
-            storageBucket: "gabri-4f94c.firebasestorage.app",
-            messagingSenderId: "415746495575", 
-            appId: "1:415746495575:web:c9730e19c9ac3e6d923f12"
-        };
-        
-        let fbApp, auth, db;
-        try { 
-            fbApp = initializeApp(FIREBASE_CONFIG); 
-            auth = getAuth(fbApp); 
-            db = getFirestore(fbApp); 
-        } catch (e) { 
-            console.error("Firebase Init Error:", e); 
-        }
+        // ============================================================================
+        // 1. CONFIGURATION
+        // ============================================================================
+        const APP_ID = 'gabri-elite-2026';
+        let FIREBASE_CONFIG;
+        try {
+            FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+                apiKey: "AIzaSyDWM2Dnq72MeWuZcV3uT4YXg0G9nyZIVAc", authDomain: "gabri-4f94c.firebaseapp.com",
+                projectId: "gabri-4f94c", storageBucket: "gabri-4f94c.firebasestorage.app",
+                messagingSenderId: "415746495575", appId: "1:415746495575:web:c9730e19c9ac3e6d923f12"
+            };
+        } catch(e) { FIREBASE_CONFIG = {}; }
 
-        // ----------------------------------------------------------------------
-        // 2. AUDIO SYNTHESIS ENGINE
-        // ----------------------------------------------------------------------
+        let app, auth, db;
+        try { app = initializeApp(FIREBASE_CONFIG); auth = getAuth(app); db = getFirestore(app); } 
+        catch (e) { console.error("Firebase Init Error"); }
+
+        // ============================================================================
+        // 2. AUDIO SYSTEM
+        // ============================================================================
         class AudioSystem {
             constructor() {
                 this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-                this.masterGain = this.ctx.createGain(); 
-                this.masterGain.gain.value = 0.3; 
-                this.masterGain.connect(this.ctx.destination);
+                this.masterGain = this.ctx.createGain(); this.masterGain.gain.value = 0.3; this.masterGain.connect(this.ctx.destination);
                 this.enabled = false;
             }
-            
-            enable() { 
-                if(this.ctx.state === 'suspended') this.ctx.resume(); 
-                this.enabled = true; 
-            }
-            
+            enable() { if(this.ctx.state === 'suspended') this.ctx.resume(); this.enabled = true; }
             playTone(freq, type, duration, vol=1, slideFreq=null) {
                 if(!this.enabled) return;
-                const osc = this.ctx.createOscillator(); 
-                const gain = this.ctx.createGain();
-                osc.type = type; 
-                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-                
+                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = type; osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
                 if(slideFreq) osc.frequency.exponentialRampToValueAtTime(slideFreq, this.ctx.currentTime + duration);
-                
-                gain.gain.setValueAtTime(vol, this.ctx.currentTime); 
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
-                
-                osc.connect(gain); 
-                gain.connect(this.masterGain); 
-                osc.start(); 
-                osc.stop(this.ctx.currentTime + duration);
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                osc.connect(gain); gain.connect(this.masterGain); osc.start(); osc.stop(this.ctx.currentTime + duration);
             }
-            
             playNoise(duration, vol=1) {
                 if(!this.enabled) return;
-                const bufferSize = this.ctx.sampleRate * duration; 
-                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                const data = buffer.getChannelData(0); 
-                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-                
-                const noise = this.ctx.createBufferSource(); 
-                noise.buffer = buffer;
-                
-                const filter = this.ctx.createBiquadFilter(); 
-                filter.type = 'lowpass'; 
-                filter.frequency.value = 1000;
-                
-                const gain = this.ctx.createGain(); 
-                gain.gain.setValueAtTime(vol, this.ctx.currentTime); 
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
-                
-                noise.connect(filter); 
-                filter.connect(gain); 
-                gain.connect(this.masterGain); 
-                noise.start();
+                const bufferSize = this.ctx.sampleRate * duration; const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = this.ctx.createBufferSource(); noise.buffer = buffer;
+                const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 1000;
+                const gain = this.ctx.createGain(); gain.gain.setValueAtTime(vol, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                noise.connect(filter); filter.connect(gain); gain.connect(this.masterGain); noise.start();
             }
-            
             sfxDash() { this.playTone(300, 'sine', 0.2, 0.5, 100); this.playNoise(0.2, 0.3); }
             sfxTag() { this.playTone(400, 'square', 0.1, 0.8, 800); setTimeout(()=>this.playTone(600, 'square', 0.2, 0.8, 1200), 100); }
             sfxLaser() { this.playTone(800, 'sawtooth', 0.15, 0.5, 200); }
@@ -576,126 +225,46 @@
             sfxBounce() { this.playTone(150, 'sine', 0.1, 0.5, 50); }
             sfxScore() { this.playTone(523.25, 'square', 0.1, 0.5); setTimeout(()=>this.playTone(659.25, 'square', 0.1, 0.5), 100); setTimeout(()=>this.playTone(783.99, 'square', 0.3, 0.5), 200); }
             sfxCheer() { for(let i=0; i<5; i++) setTimeout(()=>this.playNoise(0.4, 0.4), i*100); }
-            sfxAlert() { this.playTone(200, 'sawtooth', 0.5, 0.8, 100); }
         }
         const sfx = new AudioSystem();
 
-        // ----------------------------------------------------------------------
-        // 3. GAME STATE & CONSTANTS
-        // ----------------------------------------------------------------------
-        const GAME_DURATION_SEC = 180;
-        const MAP_WIDTH = 3000, MAP_HEIGHT = 4000; 
-        const PLAYER_SIZE = 40, BASE_SPEED = 350, TAG_COOLDOWN_MS = 2000;
-
-        let currentUser = null, myName = "Player", currentRoomId = null;
+        // ============================================================================
+        // 3. STATE & CONSTANTS
+        // ============================================================================
+        const MAP_WIDTH = 3000, MAP_HEIGHT = 4000, PLAYER_SIZE = 40, BASE_SPEED = 350;
+        
+        let currentUser = null, myName = "", currentRoom = "";
         let serverPlayers = {}, gameEntities = {};
         
-        // Sync State
         let gameState = {
-            isPlaying: false, 
-            currentGabri: null, 
-            hostId: null, 
-            roundId: null, 
-            tagCounter: 0, 
-            timeLeft: 0, 
-            
+            isPlaying: false, hostId: null, timeLeft: 180, currentGabri: null, tagCounter: 0,
             ball_x: 2200, ball_y: 1500, ball_vx: 0, ball_vy: 0, ball_owner: null, ball_ts: 0, lastScoreTs: 0,
-            
             boss_active: false, boss_hp: 500, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
-            
-            sword1_x: 1300, sword1_y: 2900, sword1_owner: null, 
-            sword2_x: 1700, sword2_y: 2900, sword2_owner: null,
-            sword3_x: 1300, sword3_y: 3100, sword3_owner: null, 
-            sword4_x: 1700, sword4_y: 3100, sword4_owner: null,
-            
-            mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null, 
-            
-            dead_npcs: {}, energy_drinks: {}
+            sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null,
+            mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null, dead_npcs: {}, energy_drinks: {}
         };
 
-        // Local State
-        let currentRoundId = null, localCurrentGabri = null, localGabriSince = 0, localTagCounter = 0;
-        let lastHostTick = 0, lastStairTime = 0;
+        let myLocalPlayer = { x: 1300, y: 1000, vx: 0, vy: 0 }, myFacing = { x: 1, y: 0 }, myHeldItem = null;
+        let activeSpeedMult = 1.0, dashSpeedMult = 1.0, energyDrinkEndTime = 0, lastDashTime = 0;
+        let lastMgShot = 0, lastSwordAttack = 0, swordStartAngle = 0;
+        let isStealthMode = false, timeStandingStill = 0;
+        let kb_vx = 0, kb_vy = 0;
         
         let localBall = { active: true, x: 2200, y: 1500, z: 0, vx: 0, vy: 0, vz: 0 };
-        let lastBallTs = 0, lastScoreTs = 0;
-        
-        let myLocalPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
-        let myFacing = { x: 1, y: 0 };
-        let myHeldItem = null;
-        
-        let activeSpeedMult = 1.0, dashSpeedMult = 1.0, energyDrinkEndTime = 0;
-        let lastDashTime = 0, lastMgShot = 0, lastSwordAttack = 0, swordStartAngle = 0;
-        let isStealthMode = false, timeStandingStill = 0;
-        let kb_vx = 0, kb_vy = 0, lastKnockbackTs = 0;
-        
-        let isGameLoopRunning = false;
-        let lastUpdateTime = performance.now(), lastSyncTime = 0;
-        let lastHeartbeatTs = 0;
-        let particles = [];
-        let camera = { x: 0, y: 0 };
+        let lastBallTs = 0, lastScoreTs = 0, lastKnockbackTs = 0, localTagCounter = 0, localGabriSince = 0;
 
-        // UI Manager
-        const UIManager = {
-            screens: document.getElementById('screens-layer'),
-            ui: document.getElementById('ui-layer'),
-            switchScreen: (id) => {
-                UIManager.screens.style.display = 'flex';
-                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-                document.getElementById(id).classList.add('active');
-            },
-            hideScreens: () => { 
-                UIManager.screens.style.display = 'none'; 
-            },
-            setStatus: (msg, colorClass) => {
-                const el = document.getElementById('serverStatus');
-                if (el) {
-                    el.innerText = msg;
-                    el.className = "text-xs text-center mb-3 font-bold p-2 rounded border transition-all " + colorClass;
-                }
-            },
-            updateLobby: () => {
-                const list = document.getElementById('lobbyPlayerList'); 
-                if(!list) return; 
-                list.innerHTML = '';
-                
-                let activeIds = Object.keys(serverPlayers).sort();
-                let isHost = activeIds[0] === currentUser?.uid;
-                
-                document.getElementById('hostControls').style.display = isHost ? 'block' : 'none';
-                document.getElementById('clientControls').style.display = isHost ? 'none' : 'block';
-                
-                for(let id in serverPlayers) {
-                    const p = serverPlayers[id]; 
-                    const isMe = id === currentUser?.uid; 
-                    const isP_Host = activeIds[0] === id;
-                    
-                    list.innerHTML += `
-                        <div class="player-item">
-                            <div class="flex items-center gap-3">
-                                <div class="status-dot"></div>
-                                <span class="font-semibold ${isMe ? 'text-primary' : 'text-white'}">
-                                    ${p.name} ${isMe ? '(Du)' : ''} ${isP_Host ? '<span class="host-crown">👑</span>' : ''}
-                                </span>
-                            </div>
-                        </div>`;
-                }
-            }
-        };
+        let camera = { x: 0, y: 0 }, particles = [];
+        let lastUpdateTime = performance.now(), isGameRunning = false;
 
-        // ----------------------------------------------------------------------
-        // 4. MAP GENERATION (Procedural Rooms, Stairs, NPCs)
-        // ----------------------------------------------------------------------
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // ============================================================================
+        // 4. MAP & NPCS
+        // ============================================================================
         let obstacles = [], labels = [], stairs = [], npcs = [], spawnDrinks = [];
         const hoop = { x: 2200, y: 1220, w: 100, h: 20 };
-        
-        const swordBases = { 
-            sword1: {x: 1300, y: 2900}, 
-            sword2: {x: 1700, y: 2900}, 
-            sword3: {x: 1300, y: 3100}, 
-            sword4: {x: 1700, y: 3100} 
-        };
-        
+        const swordBases = { sword1: {x: 1300, y: 2900}, sword2: {x: 1700, y: 2900}, sword3: {x: 1300, y: 3100}, sword4: {x: 1700, y: 3100} };
         const mapPallets = [
             { id: 'p1', dropRect: {x: 1060, y: 400, w: 40, h: 200}, upRect: {x: 1070, y: 380, w: 20, h: 20}, dir: 'v' }, 
             { id: 'p2', dropRect: {x: 1500, y: 400, w: 40, h: 200}, upRect: {x: 1510, y: 380, w: 20, h: 20}, dir: 'v' }, 
@@ -707,207 +276,76 @@
             { id: 'p8', dropRect: {x: 2000, y: 3160, w: 200, h: 40}, upRect: {x: 1980, y: 3170, w: 20, h: 20}, dir: 'h' }  
         ];
 
-        class MapGenerator {
-            static init() {
-                this.buildBorders();
-                
-                // EG
-                this.buildRoom(100, 100, 1000, 800, 'right', 300, 200, 'MATHE (EG)');
-                this.buildRoom(1500, 100, 1400, 800, 'left', 300, 200, 'BIOLOGIE (EG)');
-                this.buildRoom(100, 1200, 1000, 700, 'top', 400, 200, 'MENSA (EG)');
-                this.buildRoom(1500, 1200, 1400, 700, 'top', 500, 200, 'TURNHALLE (EG)', true); 
-                
-                // OG
-                this.buildRoom(100, 2100, 1000, 800, 'right', 300, 200, 'CHEMIE (OG)');
-                this.buildRoom(1500, 2100, 1400, 800, 'left', 300, 200, 'PHYSIK (OG)');
-                this.buildRoom(100, 3200, 1000, 700, 'top', 400, 200, 'LEHRERZIMMER (OG)');
-                this.buildRoom(1500, 3200, 1400, 700, 'top', 500, 200, 'BIBLIOTHEK (OG)');
-                
-                stairs.push({ x: 1225, y: 400, w: 150, h: 150, targetY: 2400, label: 'ZUM OG' });
-                stairs.push({ x: 1225, y: 2400, w: 150, h: 150, targetY: 400, label: 'ZUM EG' });
-                stairs.push({ x: 1225, y: 1500, w: 150, h: 150, targetY: 3500, label: 'ZUM OG' });
-                stairs.push({ x: 1225, y: 3500, w: 150, h: 150, targetY: 1500, label: 'ZUM EG' });
+        function initMap() {
+            obstacles.push({x: -50, y: -50, w: MAP_WIDTH+100, h: 50, isWall: true});
+            obstacles.push({x: -50, y: -50, w: 50, h: 2000+100, isWall: true});
+            obstacles.push({x: MAP_WIDTH, y: -50, w: 50, h: 2000+100, isWall: true});
+            obstacles.push({x: -50, y: 1980, w: MAP_WIDTH+100, h: 40, isWall: true}); 
+            obstacles.push({x: -50, y: MAP_HEIGHT, w: MAP_WIDTH+100, h: 50, isWall: true});
+            obstacles.push({x: -50, y: 2000, w: 50, h: 2000+100, isWall: true});
+            obstacles.push({x: MAP_WIDTH, y: 2000, w: 50, h: 2000+100, isWall: true});
 
-                this.spawnNPCs();
-            }
-            
-            static buildBorders() {
-                obstacles.push({x: -50, y: -50, w: MAP_WIDTH+100, h: 50, isWall: true});
-                obstacles.push({x: -50, y: -50, w: 50, h: 2000+100, isWall: true});
-                obstacles.push({x: MAP_WIDTH, y: -50, w: 50, h: 2000+100, isWall: true});
-                obstacles.push({x: -50, y: 1980, w: MAP_WIDTH+100, h: 40, isWall: true}); 
-                obstacles.push({x: -50, y: MAP_HEIGHT, w: MAP_WIDTH+100, h: 50, isWall: true});
-                obstacles.push({x: -50, y: 2000, w: 50, h: 2000+100, isWall: true});
-                obstacles.push({x: MAP_WIDTH, y: 2000, w: 50, h: 2000+100, isWall: true});
-            }
-            
-            static buildRoom(rx, ry, rw, rh, doorEdge, doorOffset, doorWidth, labelText, isEmptyRoom=false) {
+            function buildRoom(rx, ry, rw, rh, doorEdge, doorOffset, doorWidth, labelText, isEmptyRoom=false) {
                 const wall = 20; 
-                if (doorEdge === 'top') { 
-                    obstacles.push({x: rx, y: ry, w: doorOffset, h: wall, isWall: true}); 
-                    obstacles.push({x: rx + doorOffset + doorWidth, y: ry, w: rw - doorOffset - doorWidth, h: wall, isWall: true}); 
-                } else { obstacles.push({x: rx, y: ry, w: rw, h: wall, isWall: true}); }
-                
-                if (doorEdge === 'bottom') { 
-                    obstacles.push({x: rx, y: ry + rh - wall, w: doorOffset, h: wall, isWall: true}); 
-                    obstacles.push({x: rx + doorOffset + doorWidth, y: ry + rh - wall, w: rw - doorOffset - doorWidth, h: wall, isWall: true}); 
-                } else { obstacles.push({x: rx, y: ry + rh - wall, w: rw, h: wall, isWall: true}); }
-                
-                if (doorEdge === 'left') { 
-                    obstacles.push({x: rx, y: ry, w: wall, h: doorOffset, isWall: true}); 
-                    obstacles.push({x: rx, y: ry + doorOffset + doorWidth, w: wall, h: rh - doorOffset - doorWidth, isWall: true}); 
-                } else { obstacles.push({x: rx, y: ry, w: wall, h: rh, isWall: true}); }
-                
-                if (doorEdge === 'right') { 
-                    obstacles.push({x: rx + rw - wall, y: ry, w: wall, h: doorOffset, isWall: true}); 
-                    obstacles.push({x: rx + rw - wall, y: ry + doorOffset + doorWidth, w: wall, h: rh - doorOffset - doorWidth, isWall: true}); 
-                } else { obstacles.push({x: rx + rw - wall, y: ry, w: wall, h: rh, isWall: true}); }
-
+                if (doorEdge === 'top') { obstacles.push({x: rx, y: ry, w: doorOffset, h: wall, isWall: true}); obstacles.push({x: rx + doorOffset + doorWidth, y: ry, w: rw - doorOffset - doorWidth, h: wall, isWall: true}); } else { obstacles.push({x: rx, y: ry, w: rw, h: wall, isWall: true}); }
+                if (doorEdge === 'bottom') { obstacles.push({x: rx, y: ry + rh - wall, w: doorOffset, h: wall, isWall: true}); obstacles.push({x: rx + doorOffset + doorWidth, y: ry + rh - wall, w: rw - doorOffset - doorWidth, h: wall, isWall: true}); } else { obstacles.push({x: rx, y: ry + rh - wall, w: rw, h: wall, isWall: true}); }
+                if (doorEdge === 'left') { obstacles.push({x: rx, y: ry, w: wall, h: doorOffset, isWall: true}); obstacles.push({x: rx, y: ry + doorOffset + doorWidth, w: wall, h: rh - doorOffset - doorWidth, isWall: true}); } else { obstacles.push({x: rx, y: ry, w: wall, h: rh, isWall: true}); }
+                if (doorEdge === 'right') { obstacles.push({x: rx + rw - wall, y: ry, w: wall, h: doorOffset, isWall: true}); obstacles.push({x: rx + rw - wall, y: ry + doorOffset + doorWidth, w: wall, h: rh - doorOffset - doorWidth, isWall: true}); } else { obstacles.push({x: rx + rw - wall, y: ry, w: wall, h: rh, isWall: true}); }
                 if (labelText) labels.push({x: rx + rw/2, y: ry + rh/2, text: labelText});
 
                 if (!isEmptyRoom) {
-                    let cols = Math.floor((rw - wall*2) / 220); 
-                    let rows = Math.floor((rh - wall*2) / 220);
-                    let padX = (rw - wall*2 - (cols * 220)) / 2; 
-                    let padY = (rh - wall*2 - (rows * 220)) / 2;
+                    let cols = Math.floor((rw - wall*2) / 220); let rows = Math.floor((rh - wall*2) / 220);
+                    let padX = (rw - wall*2 - (cols * 220)) / 2; let padY = (rh - wall*2 - (rows * 220)) / 2;
                     for (let r=0; r<rows; r++) {
                         for (let c=0; c<cols; c++) {
-                            let tx = rx + wall + padX + c*220 + 70; 
-                            let ty = ry + wall + padY + r*220 + 70;
-                            
+                            let tx = rx + wall + padX + c*220 + 70; let ty = ry + wall + padY + r*220 + 70;
                             obstacles.push({x: tx, y: ty, w: 80, h: 40, isTable: true});
                             obstacles.push({x: tx + 10, y: ty - 25, w: 20, h: 20, isChair: true, dir: 'up'});
                             obstacles.push({x: tx + 50, y: ty - 25, w: 20, h: 20, isChair: true, dir: 'up'});
                             obstacles.push({x: tx + 10, y: ty + 45, w: 20, h: 20, isChair: true, dir: 'down'});
                             obstacles.push({x: tx + 50, y: ty + 45, w: 20, h: 20, isChair: true, dir: 'down'});
-                            
                             if (c % 3 === 0 && r % 2 === 0) spawnDrinks.push({ id: 'ed_'+tx+'_'+ty, x: tx+30, y: ty+10 });
                         }
                     }
                 }
             }
-            
-            static spawnNPCs() {
-                function mulberry32(a) { 
-                    return function() { 
-                        var t = a += 0x6D2B79F5; 
-                        t = Math.imul(t ^ t >>> 15, t | 1); 
-                        t ^= t + Math.imul(t ^ t >>> 7, t | 61); 
-                        return ((t ^ t >>> 14) >>> 0) / 4294967296; 
-                    } 
-                }
-                const prng = mulberry32(12345); 
 
-                for (let i = 0; i < 100; i++) {
-                    let type, sx, sy, mx, my, spd;
-                    if (i < 5) { 
-                        type = 'teacher'; 
-                        sx = 1250 + prng() * 150; 
-                        sy = 200 + prng() * 1600;
-                        mx = 0; 
-                        my = (prng() > 0.5 ? 1 : -1); 
-                        spd = 100 + prng() * 50;
-                    } else if (i < 15) { 
-                        type = 'cheerleader'; 
-                        sx = 1600 + prng() * 1200; 
-                        sy = 1300 + prng() * 500;
-                        mx = 0; 
-                        my = 0; 
-                        spd = 0;
-                    } else { 
-                        type = 'student'; 
-                        let inOG = prng() > 0.5; 
-                        sx = 1150 + prng() * 200; 
-                        sy = (inOG ? 2100 : 100) + prng() * 1700;
-                        mx = 0; 
-                        my = (prng() > 0.5 ? 1 : -1); 
-                        spd = 80 + prng() * 40;
-                    }
-                    npcs.push({ 
-                        id: i, 
-                        startX: sx, 
-                        startY: sy, 
-                        moveX: mx, 
-                        moveY: my, 
-                        speed: spd, 
-                        type: type, 
-                        currentX: sx, 
-                        currentY: sy 
-                    });
+            buildRoom(100, 100, 1000, 800, 'right', 300, 200, 'MATHE (EG)');
+            buildRoom(1500, 100, 1400, 800, 'left', 300, 200, 'BIOLOGIE (EG)');
+            buildRoom(100, 1200, 1000, 700, 'top', 400, 200, 'MENSA (EG)');
+            buildRoom(1500, 1200, 1400, 700, 'top', 500, 200, 'TURNHALLE (EG)', true); 
+            buildRoom(100, 2100, 1000, 800, 'right', 300, 200, 'CHEMIE (OG)');
+            buildRoom(1500, 2100, 1400, 800, 'left', 300, 200, 'PHYSIK (OG)');
+            buildRoom(100, 3200, 1000, 700, 'top', 400, 200, 'LEHRERZIMMER (OG)');
+            buildRoom(1500, 3200, 1400, 700, 'top', 500, 200, 'BIBLIOTHEK (OG)');
+            
+            stairs.push({ x: 1225, y: 400, w: 150, h: 150, targetY: 2400, label: 'ZUM OG' });
+            stairs.push({ x: 1225, y: 2400, w: 150, h: 150, targetY: 400, label: 'ZUM EG' });
+            stairs.push({ x: 1225, y: 1500, w: 150, h: 150, targetY: 3500, label: 'ZUM OG' });
+            stairs.push({ x: 1225, y: 3500, w: 150, h: 150, targetY: 1500, label: 'ZUM EG' });
+
+            function mulberry32(a) { return function() { var t = a += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; } }
+            const prng = mulberry32(12345); 
+
+            for (let i = 0; i < 100; i++) {
+                let type, sx, sy, mx, my, spd;
+                if (i < 5) { 
+                    type = 'teacher'; sx = 1250 + prng() * 150; sy = 200 + prng() * 1600;
+                    mx = 0; my = (prng() > 0.5 ? 1 : -1); spd = 100 + prng() * 50;
+                } else if (i < 15) { 
+                    type = 'cheerleader'; sx = 1600 + prng() * 1200; sy = 1300 + prng() * 500;
+                    mx = 0; my = 0; spd = 0;
+                } else { 
+                    type = 'student'; let inOG = prng() > 0.5; sx = 1150 + prng() * 200; sy = (inOG ? 2100 : 100) + prng() * 1700;
+                    mx = 0; my = (prng() > 0.5 ? 1 : -1); spd = 80 + prng() * 40;
                 }
+                npcs.push({ id: i, startX: sx, startY: sy, moveX: mx, moveY: my, speed: spd, type: type, currentX: sx, currentY: sy });
             }
         }
-        MapGenerator.init();
+        initMap();
 
         // ----------------------------------------------------------------------
-        // 5. GRAPHICS & SPRITES
-        // ----------------------------------------------------------------------
-        function createPixelSprite(type, frame=0) {
-            const sc = document.createElement('canvas'); 
-            sc.width = 12; 
-            sc.height = 12; 
-            const ctx = sc.getContext('2d');
-            
-            let skin = '#ffcba4', shirt = '#00ffcc', pants = '#1a1a24', hair = '#1a1a24';
-
-            if (type === 'gabri') { skin = '#ff99aa'; shirt = '#ff3366'; }
-            else if (type === 'teacher') { skin = '#eebb99'; shirt = '#555555'; hair = '#cccccc'; }
-            else if (type === 'boss') { skin = '#ff4444'; shirt = '#220000'; pants = '#110000'; hair = '#ffaa00'; }
-            else if (type === 'cheerleader') { skin = '#ffcba4'; shirt = '#ff66b2'; pants = '#ffffff'; hair = '#ffee66'; }
-            else if (type === 'student') { shirt = '#3366ff'; pants = '#444444'; hair = '#5c3a21'; } 
-            else if (type === 'zombie') { skin = '#4caf50'; shirt = '#673ab7'; pants = '#3e2723'; hair = '#1b5e20'; } 
-
-            let layout = [
-                [0,0,0,0,6,6,6,6,0,0,0,0], 
-                [0,0,0,6,2,2,2,2,6,0,0,0], 
-                [0,0,6,2,0,2,2,0,2,6,0,0],
-                [0,0,6,2,2,2,2,2,2,6,0,0], 
-                [0,0,0,6,2,2,2,2,6,0,0,0], 
-                [0,0,3,3,3,3,3,3,3,3,0,0],
-                [0,3,3,3,3,3,3,3,3,3,3,0], 
-                [0,3,3,3,3,3,3,3,3,3,3,0], 
-                [0,3,0,4,4,4,4,4,4,0,3,0],
-                [0,0,0,4,4,0,0,4,4,0,0,0], 
-                [0,0,5,5,0,0,0,0,5,5,0,0]
-            ];
-
-            if (type === 'cheerleader') { 
-                layout[5][0] = 3; layout[5][11] = 3; layout[6][0] = 3; layout[6][11] = 3; 
-            }
-
-            if (frame === 1) { 
-                layout[9] = [0,0,0,4,4,0,0,0,0,0,0,0]; 
-                layout[10]= [0,0,5,5,0,0,0,4,4,0,0,0]; 
-            }
-
-            for(let y=0; y<11; y++) {
-                for(let x=0; x<12; x++) {
-                    let p = layout[y][x];
-                    if(p!==0){
-                        switch(p){
-                            case 6: ctx.fillStyle = hair; break; 
-                            case 1: case 4: ctx.fillStyle = pants; break; 
-                            case 2: ctx.fillStyle = skin; break; 
-                            case 3: ctx.fillStyle = shirt; break; 
-                            case 5: ctx.fillStyle = '#111'; break;
-                        }
-                        ctx.fillRect(x, y, 1, 1);
-                    }
-                }
-            }
-            return sc;
-        }
-        
-        const texNormal = [createPixelSprite('normal', 0), createPixelSprite('normal', 1)];
-        const texGabri = [createPixelSprite('gabri', 0), createPixelSprite('gabri', 1)];
-        const texTeacher = [createPixelSprite('teacher', 0), createPixelSprite('teacher', 1)];
-        const texStudent = [createPixelSprite('student', 0), createPixelSprite('student', 1)];
-        const texCheer = [createPixelSprite('cheerleader', 0), createPixelSprite('cheerleader', 1)];
-        const texBoss = [createPixelSprite('boss', 0), createPixelSprite('boss', 1)];
-        const texZombie = [createPixelSprite('zombie', 0), createPixelSprite('zombie', 1)];
-
-        // ----------------------------------------------------------------------
-        // 6. INPUT CONTROLLER
+        // 5. INPUT CONTROLLER
         // ----------------------------------------------------------------------
         const Input = {
             joyBase: { x: 120, y: window.innerHeight - 120, r: 70 },
@@ -919,8 +357,7 @@
             
             init() {
                 window.addEventListener('resize', () => { 
-                    canvas.width = window.innerWidth; 
-                    canvas.height = window.innerHeight; 
+                    canvas.width = window.innerWidth; canvas.height = window.innerHeight; 
                     this.joyBase = { x: 120, y: window.innerHeight - 120, r: 70 };
                     this.btnA = { x: window.innerWidth - 90, y: window.innerHeight - 90, r: 45, active: false };
                     this.btnB = { x: window.innerWidth - 180, y: window.innerHeight - 140, r: 45, active: false };
@@ -928,455 +365,195 @@
                 });
                 
                 window.addEventListener('keydown', (e) => {
+                    if(!isGameRunning) return;
                     let key = e.key.toLowerCase();
                     if (this.keys.hasOwnProperty(key)) this.keys[key] = true;
-                    
-                    if (key === ' ' || key === 'spacebar') { 
-                        if(!this.btnA.active) Actions.doA(); 
-                        this.btnA.active = true; 
-                    }
-                    if (key === 'shift') { 
-                        if(!this.btnB.active) Actions.doB(); 
-                        this.btnB.active = true; 
-                    }
-                    if (key === 'c' || key === 'y' || key === 'q') { 
-                        if(!this.btnC.active) Actions.doC(); 
-                        this.btnC.active = true; 
-                    }
+                    if (key === ' ' || key === 'spacebar') { if(!this.btnA.active) Actions.doA(); this.btnA.active = true; }
+                    if (key === 'shift') { if(!this.btnB.active) Actions.doB(); this.btnB.active = true; }
+                    if (key === 'c' || key === 'y' || key === 'q') { if(!this.btnC.active) Actions.doC(); this.btnC.active = true; }
                 });
                 
                 window.addEventListener('keyup', (e) => {
                     let key = e.key.toLowerCase();
                     if (this.keys.hasOwnProperty(key)) this.keys[key] = false;
-                    
                     if (key === ' ' || key === 'spacebar') this.btnA.active = false;
                     if (key === 'shift') this.btnB.active = false;
                     if (key === 'c' || key === 'y' || key === 'q') this.btnC.active = false;
                 });
 
                 canvas.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
+                    e.preventDefault(); if(!isGameRunning) return;
                     for(let t of e.changedTouches) {
                         if (Math.hypot(t.clientX - this.joyBase.x, t.clientY - this.joyBase.y) < this.joyBase.r * 2.5 && !this.joystick.active) {
-                            this.joystick.active = true; 
-                            this.joystick.id = t.identifier; 
-                            this.joystick.nx = t.clientX; 
-                            this.joystick.ny = t.clientY; 
-                            this.clampJoy();
-                        } else if (Math.hypot(t.clientX - this.btnA.x, t.clientY - this.btnA.y) < this.btnA.r * 1.5) { 
-                            this.btnA.active = true; 
-                            Actions.doA(); 
-                        } else if (Math.hypot(t.clientX - this.btnB.x, t.clientY - this.btnB.y) < this.btnB.r * 1.5) { 
-                            this.btnB.active = true; 
-                            Actions.doB(); 
-                        } else if (Math.hypot(t.clientX - this.btnC.x, t.clientY - this.btnC.y) < this.btnC.r * 1.5) { 
-                            this.btnC.active = true; 
-                            Actions.doC(); 
-                        }
+                            this.joystick.active = true; this.joystick.id = t.identifier; this.joystick.nx = t.clientX; this.joystick.ny = t.clientY; this.clampJoy();
+                        } else if (Math.hypot(t.clientX - this.btnA.x, t.clientY - this.btnA.y) < this.btnA.r * 1.5) { this.btnA.active = true; Actions.doA(); }
+                        else if (Math.hypot(t.clientX - this.btnB.x, t.clientY - this.btnB.y) < this.btnB.r * 1.5) { this.btnB.active = true; Actions.doB(); }
+                        else if (Math.hypot(t.clientX - this.btnC.x, t.clientY - this.btnC.y) < this.btnC.r * 1.5) { this.btnC.active = true; Actions.doC(); }
                     }
                 }, {passive: false});
 
                 canvas.addEventListener('touchmove', (e) => {
-                    e.preventDefault();
-                    for(let t of e.changedTouches) {
-                        if(t.identifier === this.joystick.id) { 
-                            this.joystick.nx = t.clientX; 
-                            this.joystick.ny = t.clientY; 
-                            this.clampJoy(); 
-                        }
-                    }
+                    e.preventDefault(); if(!isGameRunning) return;
+                    for(let t of e.changedTouches) { if(t.identifier === this.joystick.id) { this.joystick.nx = t.clientX; this.joystick.ny = t.clientY; this.clampJoy(); } }
                 }, {passive: false});
 
                 const endTouch = (e) => {
                     e.preventDefault();
                     for(let t of e.changedTouches) {
-                        if(t.identifier === this.joystick.id) { 
-                            this.joystick.active = false; 
-                            this.joystick.id = null; 
-                            this.joystick.nx = this.joyBase.x; 
-                            this.joystick.ny = this.joyBase.y; 
-                            this.joystick.dx = 0; 
-                            this.joystick.dy = 0; 
-                        }
+                        if(t.identifier === this.joystick.id) { this.joystick.active = false; this.joystick.id = null; this.joystick.nx = this.joyBase.x; this.joystick.ny = this.joyBase.y; this.joystick.dx = 0; this.joystick.dy = 0; }
                         if (Math.hypot(t.clientX - this.btnA.x, t.clientY - this.btnA.y) < this.btnA.r * 2) this.btnA.active = false;
                         if (Math.hypot(t.clientX - this.btnB.x, t.clientY - this.btnB.y) < this.btnB.r * 2) this.btnB.active = false;
                         if (Math.hypot(t.clientX - this.btnC.x, t.clientY - this.btnC.y) < this.btnC.r * 2) this.btnC.active = false;
                     }
                 };
-                
-                canvas.addEventListener('touchend', endTouch, {passive: false}); 
-                canvas.addEventListener('touchcancel', endTouch, {passive: false});
+                canvas.addEventListener('touchend', endTouch, {passive: false}); canvas.addEventListener('touchcancel', endTouch, {passive: false});
             },
-            
             clampJoy() {
                 const dist = Math.hypot(this.joystick.nx - this.joyBase.x, this.joystick.ny - this.joyBase.y);
-                if (dist > this.joyBase.r) { 
-                    const angle = Math.atan2(this.joystick.ny - this.joyBase.y, this.joystick.nx - this.joyBase.x); 
-                    this.joystick.nx = this.joyBase.x + Math.cos(angle) * this.joyBase.r; 
-                    this.joystick.ny = this.joyBase.y + Math.sin(angle) * this.joyBase.r; 
-                }
-                
-                if (dist > 10) { 
-                    this.joystick.dx = (this.joystick.nx - this.joyBase.x) / this.joyBase.r; 
-                    this.joystick.dy = (this.joystick.ny - this.joyBase.y) / this.joyBase.r; 
-                } else { 
-                    this.joystick.dx = 0; 
-                    this.joystick.dy = 0; 
-                }
+                if (dist > this.joyBase.r) { const angle = Math.atan2(this.joystick.ny - this.joyBase.y, this.joystick.nx - this.joyBase.x); this.joystick.nx = this.joyBase.x + Math.cos(angle) * this.joyBase.r; this.joystick.ny = this.joyBase.y + Math.sin(angle) * this.joyBase.r; }
+                if (dist > 10) { this.joystick.dx = (this.joystick.nx - this.joyBase.x) / this.joyBase.r; this.joystick.dy = (this.joystick.ny - this.joyBase.y) / this.joyBase.r; } else { this.joystick.dx = 0; this.joystick.dy = 0; }
             },
-            
             getVector() {
                 let kx = 0; let ky = 0;
-                if (this.keys.w || this.keys.arrowup) ky -= 1; 
-                if (this.keys.s || this.keys.arrowdown) ky += 1;
-                if (this.keys.a || this.keys.arrowleft) kx -= 1; 
-                if (this.keys.d || this.keys.arrowright) kx += 1;
-                
-                if (kx !== 0 && ky !== 0) { 
-                    const len = Math.hypot(kx, ky); 
-                    kx /= len; 
-                    ky /= len; 
-                }
-                return { 
-                    dx: this.joystick.active ? this.joystick.dx : kx, 
-                    dy: this.joystick.active ? this.joystick.dy : ky 
-                };
+                if (this.keys.w || this.keys.arrowup) ky -= 1; if (this.keys.s || this.keys.arrowdown) ky += 1;
+                if (this.keys.a || this.keys.arrowleft) kx -= 1; if (this.keys.d || this.keys.arrowright) kx += 1;
+                if (kx !== 0 && ky !== 0) { const len = Math.hypot(kx, ky); kx /= len; ky /= len; }
+                return { dx: this.joystick.active ? this.joystick.dx : kx, dy: this.joystick.active ? this.joystick.dy : ky };
             }
         };
         Input.init();
 
         // ----------------------------------------------------------------------
-        // 7. PHYSICS & ACTIONS MODULE
+        // 6. GAME ACTIONS
         // ----------------------------------------------------------------------
-        const Physics = {
-            checkWall(nx, ny) {
-                if (nx < 0 || ny < 0 || nx + PLAYER_SIZE > MAP_WIDTH || ny + PLAYER_SIZE > MAP_HEIGHT) return true;
-                
-                for (let obs of obstacles) {
-                    if (nx < obs.x + obs.w && nx + PLAYER_SIZE > obs.x && ny < obs.y + obs.h && ny + PLAYER_SIZE > obs.y) return true;
-                }
-                
-                for (let p of mapPallets) {
-                    if (gameState['pallet_'+p.id] === 1) {
-                        if (nx < p.dropRect.x + p.dropRect.w && nx + PLAYER_SIZE > p.dropRect.x && ny < p.dropRect.y + p.dropRect.h && ny + PLAYER_SIZE > p.dropRect.y) return true;
-                    }
-                }
-                
-                for (let npc of npcs) {
-                    if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue;
-                    if (nx < npc.currentX + PLAYER_SIZE && nx + PLAYER_SIZE > npc.currentX && ny < npc.currentY + PLAYER_SIZE && ny + PLAYER_SIZE > npc.currentY) return true;
-                }
-                return false;
-            },
-            
-            spawnParticles(x, y, color, count=15) { 
-                for(let i=0; i<count; i++) {
-                    particles.push({ 
-                        x: x, y: y, 
-                        vx: (Math.random() - 0.5) * 400, 
-                        vy: (Math.random() - 0.5) * 400, 
-                        life: 1.0, 
-                        color: color 
-                    }); 
-                }
-            },
-            
-            spawnConfetti(cx, cy) {
-                const colors = ['#ff3366', '#00ffcc', '#ffcc00', '#3366ff'];
-                for(let i=0; i<60; i++) {
-                    particles.push({ 
-                        x: cx, y: cy, 
-                        vx: (Math.random() - 0.5) * 800, 
-                        vy: (Math.random() - 1.0) * 800, 
-                        life: 1.5, 
-                        color: colors[Math.floor(Math.random() * colors.length)], 
-                        isConfetti: true 
-                    });
-                }
-            }
-        };
-
         const Actions = {
             doA() {
-                if (!gameState.isPlaying || !currentRoomId) return;
+                const cx = myLocalPlayer.x + PLAYER_SIZE/2; const cy = myLocalPlayer.y + PLAYER_SIZE/2;
+                const isGabri = (localCurrentGabri === currentUser.uid); const now = Date.now();
                 
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-                const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid);
-                
-                const cx = myLocalPlayer.x + PLAYER_SIZE/2; 
-                const cy = myLocalPlayer.y + PLAYER_SIZE/2;
-                
-                const isGabri = (localCurrentGabri === currentUser.uid); 
-                const now = Date.now();
-                
-                // PRIO 1: PALLETS (DbD Style)
-                let nearestPallet = null; 
-                let minDistP = 120;
+                // 1. Pallets
+                let nearestPallet = null; let minDistP = 120;
                 for (let p of mapPallets) {
-                    let pcx = p.dropRect.x + p.dropRect.w/2; 
-                    let pcy = p.dropRect.y + p.dropRect.h/2;
-                    let d = Math.hypot(cx - pcx, cy - pcy); 
-                    if (d < minDistP) { minDistP = d; nearestPallet = p; }
+                    let pcx = p.dropRect.x + p.dropRect.w/2; let pcy = p.dropRect.y + p.dropRect.h/2;
+                    let d = Math.hypot(cx - pcx, cy - pcy); if (d < minDistP) { minDistP = d; nearestPallet = p; }
                 }
 
                 if (nearestPallet) {
                     const pState = gameState['pallet_'+nearestPallet.id] || 0;
-                    
                     if (pState === 0) {
-                        let up = {}; 
-                        up['pallet_'+nearestPallet.id] = 1; 
-                        updateDoc(roomRef, up);
-                        Physics.spawnParticles(nearestPallet.dropRect.x + nearestPallet.dropRect.w/2, nearestPallet.dropRect.y + nearestPallet.dropRect.h/2, '#8b5a2b');
-                        sfx.playNoise(0.2, 0.7); 
-                        return; 
-                        
+                        updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { ['pallet_'+nearestPallet.id]: 1 });
+                        sfx.playNoise(0.2, 0.7); return; 
                     } else if (pState === 1) {
                         const moveVec = Input.getVector();
-                        
                         if (isGabri || (Math.abs(moveVec.dx) < 0.1 && Math.abs(moveVec.dy) < 0.1)) {
-                            // Zerstören
-                            let up = {}; 
-                            up['pallet_'+nearestPallet.id] = 2; 
-                            updateDoc(roomRef, up);
-                            Physics.spawnParticles(nearestPallet.dropRect.x + nearestPallet.dropRect.w/2, nearestPallet.dropRect.y + nearestPallet.dropRect.h/2, '#ffcc00');
-                            sfx.playNoise(0.3, 0.9); 
-                            return;
-                            
+                            updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { ['pallet_'+nearestPallet.id]: 2 });
+                            sfx.playNoise(0.3, 0.9); return;
                         } else {
-                            // Vaulting (Darüber springen)
                             const isVert = nearestPallet.dir === 'v';
-                            if (isVert) { 
-                                if (myLocalPlayer.x < nearestPallet.dropRect.x) {
-                                    myLocalPlayer.x = nearestPallet.dropRect.x + nearestPallet.dropRect.w + 10; 
-                                } else {
-                                    myLocalPlayer.x = nearestPallet.dropRect.x - PLAYER_SIZE - 10; 
-                                }
-                            } else { 
-                                if (myLocalPlayer.y < nearestPallet.dropRect.y) {
-                                    myLocalPlayer.y = nearestPallet.dropRect.y + nearestPallet.dropRect.h + 10; 
-                                } else {
-                                    myLocalPlayer.y = nearestPallet.dropRect.y - PLAYER_SIZE - 10; 
-                                }
-                            }
-                            Physics.spawnParticles(cx, cy, '#00ffcc'); 
-                            sfx.sfxDash(); 
-                            return;
+                            if (isVert) { if (myLocalPlayer.x < nearestPallet.dropRect.x) myLocalPlayer.x = nearestPallet.dropRect.x + nearestPallet.dropRect.w + 10; else myLocalPlayer.x = nearestPallet.dropRect.x - PLAYER_SIZE - 10; } 
+                            else { if (myLocalPlayer.y < nearestPallet.dropRect.y) myLocalPlayer.y = nearestPallet.dropRect.y + nearestPallet.dropRect.h + 10; else myLocalPlayer.y = nearestPallet.dropRect.y - PLAYER_SIZE - 10; }
+                            sfx.sfxDash(); return;
                         }
                     }
                 }
 
-                // PRIO 2: ITEMS BENUTZEN
+                // 2. USE ITEMS
                 if (myHeldItem === 'ball') {
-                    myHeldItem = null; 
-                    sfx.playTone(300, 'sine', 0.1);
-                    
-                    updateDoc(roomRef, { 
-                        'ball_owner': null, 
-                        'ball_x': cx, 
-                        'ball_y': cy, 
-                        'ball_vx': myFacing.x * 1200, 
-                        'ball_vy': myFacing.y * 1200, 
-                        'ball_ts': now 
+                    myHeldItem = null; sfx.playTone(300, 'sine', 0.1);
+                    updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { 
+                        'ball_owner': null, 'ball_x': cx, 'ball_y': cy, 'ball_vx': myFacing.x * 1200, 'ball_vy': myFacing.y * 1200, 'ball_ts': now 
                     });
                     return;
-                    
                 } else if (myHeldItem === 'mg') {
-                    if (now - lastMgShot < 150) return; 
-                    
-                    lastMgShot = now; 
-                    sfx.sfxLaser();
-                    
-                    let hitTarget = null; 
-                    let lx = cx; 
-                    let ly = cy;
-                    
-                    // Hitscan Raycast
+                    if (now - lastMgShot < 150 || !gameState.isPlaying) return; 
+                    lastMgShot = now; sfx.sfxLaser();
+                    let hitTarget = null; let lx = cx; let ly = cy;
                     for(let i=0; i<20; i++) {
-                        lx += myFacing.x * 40; 
-                        ly += myFacing.y * 40;
-                        
-                        if (Physics.checkWall(lx, ly)) break; 
-                        
+                        lx += myFacing.x * 40; ly += myFacing.y * 40;
+                        if (lx < 0 || lx > MAP_WIDTH || ly < 0 || ly > MAP_HEIGHT) break; // Simple wall check
                         if (gameState.boss_active && gameState.boss_hp > 0 && cy > 2000) {
-                            if (Math.hypot(lx - (gameState.boss_x+60), ly - (gameState.boss_y+60)) < 70) { 
-                                hitTarget = 'boss'; break; 
-                            }
-                        }
-                        for(let npc of npcs) {
-                            if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue;
-                            let sameFloor = (cy > 2000 && npc.currentY > 2000) || (cy < 2000 && npc.currentY < 2000);
-                            if (sameFloor && Math.hypot(lx - (npc.currentX+20), ly - (npc.currentY+20)) < 30) { 
-                                hitTarget = 'npc_' + npc.id; break; 
-                            }
+                            if (Math.hypot(lx - (gameState.boss_x+60), ly - (gameState.boss_y+60)) < 70) { hitTarget = 'boss'; break; }
                         }
                         for(let id in serverPlayers) {
-                            if (id === currentUser.uid) continue; 
-                            let p = serverPlayers[id];
-                            let sameFloor = (cy > 2000 && p.y > 2000) || (cy < 2000 && p.y < 2000);
-                            if (sameFloor && Math.hypot(lx - (p.x+20), ly - (p.y+20)) < 30) { 
-                                hitTarget = id; break; 
-                            }
+                            if (id === currentUser.uid) continue; let p = serverPlayers[id];
+                            if (Math.hypot(lx - (p.x+20), ly - (p.y+20)) < 30) { hitTarget = id; break; }
                         }
                         if (hitTarget) break;
                     }
-
                     let updates = { last_laser: { x1: cx, y1: cy, x2: lx, y2: ly, ts: now } };
-                    
                     if (hitTarget) {
-                        if (hitTarget === 'boss') {
-                            updates.boss_hp = increment(-50); 
-                        } else if (hitTarget.startsWith('npc_')) {
-                            updates['dead_npcs.' + hitTarget.split('_')[1]] = true;
-                        } else {
-                            updates[`knockback_${hitTarget}`] = { vx: myFacing.x * 2000, vy: myFacing.y * 2000, ts: now }; 
-                        }
+                        if (hitTarget === 'boss') updates.boss_hp = increment(-50); 
+                        else updates[`knockback_${hitTarget}`] = { vx: myFacing.x * 2000, vy: myFacing.y * 2000, ts: now }; 
                     }
-                    
-                    updateDoc(myRef, { action_ts: now, action_type: 'shoot' }); 
-                    updateDoc(roomRef, updates); 
-                    return;
-
+                    updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { action_ts: now, action_type: 'shoot' }); 
+                    updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), updates); return;
                 } else if (myHeldItem && myHeldItem.startsWith('sword')) {
-                    lastSwordAttack = now; 
-                    swordStartAngle = Math.atan2(myFacing.y, myFacing.x) - Math.PI/2;
-                    Physics.spawnParticles(cx + myFacing.x*30, cy + myFacing.y*30, '#ffffff'); 
-                    sfx.sfxSword();
-                    
+                    if (!gameState.isPlaying) return;
+                    lastSwordAttack = now; swordStartAngle = Math.atan2(myFacing.y, myFacing.x) - Math.PI/2; sfx.sfxSword();
                     let updates = {};
-                    
                     if (gameState.boss_active && gameState.boss_hp > 0) {
-                        if (Math.hypot(cx - (gameState.boss_x + 60), cy - (gameState.boss_y + 60)) < 150) {
-                            updates.boss_hp = increment(-50); 
-                            Physics.spawnParticles(gameState.boss_x + 60, gameState.boss_y + 60, '#ffcc00'); 
-                        }
+                        if (Math.hypot(cx - (gameState.boss_x + 60), cy - (gameState.boss_y + 60)) < 150) updates.boss_hp = increment(-50); 
                     }
-                    
-                    for(let npc of npcs) {
-                        if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue;
-                        let sameFloor = (cy > 2000 && npc.currentY > 2000) || (cy < 2000 && npc.currentY < 2000);
-                        if (sameFloor && Math.hypot(cx + myFacing.x*50 - (npc.currentX+20), cy + myFacing.y*50 - (npc.currentY+20)) < 60) {
-                            updates['dead_npcs.' + npc.id] = true; 
-                            Physics.spawnParticles(npc.currentX + 20, npc.currentY + 20, '#ff0000');
-                        }
-                    }
-                    
-                    updateDoc(myRef, { action_ts: now, action_type: 'sword', action_angle: swordStartAngle });
-                    if (Object.keys(updates).length > 0) updateDoc(roomRef, updates); 
-                    return;
+                    updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { action_ts: now, action_type: 'sword', action_angle: swordStartAngle });
+                    if (Object.keys(updates).length > 0) updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), updates); return;
                 }
 
-                // PRIO 3: ITEMS AUFHEBEN
+                // 3. PICKUP ITEMS
                 if (!gameState.ball_owner && localBall.active && Math.hypot(cx - localBall.x, cy - localBall.y) < 100) {
-                    myHeldItem = 'ball'; 
-                    sfx.playTone(400, 'sine', 0.1); 
-                    updateDoc(roomRef, { 'ball_owner': currentUser.uid, 'ball_x': localBall.x, 'ball_y': localBall.y }); 
-                    return;
+                    myHeldItem = 'ball'; sfx.playTone(400, 'sine', 0.1); 
+                    updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { 'ball_owner': currentUser.uid, 'ball_x': localBall.x, 'ball_y': localBall.y }); return;
                 }
-                
                 if (gameState.mg_dropped && !gameState.mg_owner && Math.hypot(cx - gameState.mg_x, cy - gameState.mg_y) < 100) {
-                    myHeldItem = 'mg'; 
-                    sfx.playTone(400, 'sine', 0.1); 
-                    updateDoc(roomRef, { mg_owner: currentUser.uid }); 
-                    return;
+                    myHeldItem = 'mg'; sfx.playTone(400, 'sine', 0.1); 
+                    updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { mg_owner: currentUser.uid }); return;
                 }
-                
                 for (let i = 1; i <= 4; i++) {
-                    const sKey = 'sword' + i; 
-                    let sx = gameState[sKey+'_x'] !== undefined ? gameState[sKey+'_x'] : swordBases[sKey].x; 
-                    let sy = gameState[sKey+'_y'] !== undefined ? gameState[sKey+'_y'] : swordBases[sKey].y;
-                    
+                    const sKey = 'sword' + i; let sx = gameState[sKey+'_x'] || swordBases[sKey].x; let sy = gameState[sKey+'_y'] || swordBases[sKey].y;
                     if (!gameState[sKey+'_owner'] && Math.hypot(cx - sx, cy - sy) < 100) {
-                        myHeldItem = sKey; 
-                        let update = {}; 
-                        update[sKey+'_owner'] = currentUser.uid; 
-                        updateDoc(roomRef, update); 
-                        sfx.playTone(400, 'sine', 0.1); 
-                        return;
+                        myHeldItem = sKey; updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { [sKey+'_owner']: currentUser.uid }); sfx.playTone(400, 'sine', 0.1); return;
                     }
                 }
-                
                 for(let d of spawnDrinks) {
                     if (gameState.energy_drinks && gameState.energy_drinks[d.id]) continue;
-                    
                     if (Math.hypot(cx - d.x, cy - d.y) < 60) {
-                        let up = {}; 
-                        up['energy_drinks.' + d.id] = true; 
-                        updateDoc(roomRef, up);
-                        
-                        activeSpeedMult = 1.8; 
-                        energyDrinkEndTime = now + 5000; 
-                        
-                        Physics.spawnParticles(cx, cy, '#00ffcc'); 
-                        sfx.playTone(600, 'square', 0.2); 
-                        return;
+                        updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { ['energy_drinks.' + d.id]: true });
+                        activeSpeedMult = 1.8; energyDrinkEndTime = now + 5000; sfx.playTone(600, 'square', 0.2); return;
                     }
                 }
             },
-            
             doB() {
                 const now = Date.now();
                 if (now - lastDashTime > 2000 && (Math.abs(myFacing.x) > 0 || Math.abs(myFacing.y) > 0)) {
-                    dashSpeedMult = 4.0; 
-                    lastDashTime = now;
-                    Physics.spawnParticles(myLocalPlayer.x + PLAYER_SIZE/2, myLocalPlayer.y + PLAYER_SIZE/2, '#00ffcc'); 
-                    sfx.sfxDash();
+                    dashSpeedMult = 4.0; lastDashTime = now; sfx.sfxDash();
                 }
             },
-            
             doC() { 
-                // Neues Drop System!
-                if (!gameState.isPlaying || !currentRoomId || !myHeldItem) return;
-                
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-                const cx = myLocalPlayer.x + PLAYER_SIZE/2; 
-                const cy = myLocalPlayer.y + PLAYER_SIZE/2;
-                
+                if (!currentRoom || !myHeldItem) return;
+                const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom);
+                const cx = myLocalPlayer.x + PLAYER_SIZE/2; const cy = myLocalPlayer.y + PLAYER_SIZE/2;
                 let updates = {};
-                
-                if (myHeldItem === 'ball') { 
-                    updates.ball_owner = null; 
-                    updates.ball_x = cx; 
-                    updates.ball_y = cy; 
-                    updates.ball_vx = 0; 
-                    updates.ball_vy = 0; 
-                    updates.ball_ts = Date.now(); 
-                } else if (myHeldItem === 'mg') { 
-                    updates.mg_owner = null; 
-                    updates.mg_x = cx; 
-                    updates.mg_y = cy; 
-                } else if (myHeldItem.startsWith('sword')) { 
-                    updates[myHeldItem+'_owner'] = null; 
-                    updates[myHeldItem+'_x'] = cx; 
-                    updates[myHeldItem+'_y'] = cy; 
-                }
-                
-                myHeldItem = null; 
-                updateDoc(roomRef, updates); 
-                sfx.playTone(200, 'sine', 0.1);
+                if (myHeldItem === 'ball') { updates.ball_owner = null; updates.ball_x = cx; updates.ball_y = cy; updates.ball_vx = 0; updates.ball_vy = 0; updates.ball_ts = Date.now(); } 
+                else if (myHeldItem === 'mg') { updates.mg_owner = null; updates.mg_x = cx; updates.mg_y = cy; } 
+                else if (myHeldItem.startsWith('sword')) { updates[myHeldItem+'_owner'] = null; updates[myHeldItem+'_x'] = cx; updates[myHeldItem+'_y'] = cy; }
+                myHeldItem = null; updateDoc(roomRef, updates); sfx.playTone(200, 'sine', 0.1);
             }
         };
 
         // ============================================================================
-        // 8. NETWORK CONTROLLER (AUTH & .IO LOGIC)
+        // 7. LOGIN & NETWORK 
         // ============================================================================
+        let errBox = document.getElementById('errorBox');
         
-        // DIREKT START: Auth Listener passiv lauschen lassen, aber nicht zwingend erzwingen
         document.getElementById('btnJoin').addEventListener('click', async () => {
-            const name = document.getElementById('playerNameInput').value.trim();
-            if (!name) { 
-                UIManager.setStatus("⚠️ BITTE NAMEN EINGEBEN!", "text-yellow-400 border-yellow-900");
-                return; 
-            }
-            
-            myName = name.substring(0, 12);
+            const name = document.getElementById('inputName').value.trim();
+            const room = document.getElementById('inputRoom').value;
+            if (!name) { errBox.innerText = "BITTE NAMEN EINGEBEN!"; errBox.style.display = 'block'; return; }
             
             const btn = document.getElementById('btnJoin');
-            btn.innerText = "VERBINDE..."; 
-            btn.disabled = true; 
-            UIManager.setStatus("📡 AUTHENTIFIZIERUNG...", "text-yellow-400 border-yellow-900");
+            btn.innerText = "VERBINDUNG WIRD HERGESTELLT..."; btn.disabled = true; errBox.style.display = 'none';
             
             try {
-                // Wir erzwingen hier direkt den Login, keine Race Conditions mehr!
+                // FORCE FIREBASE AUTHENTICATION NOW!
                 if (!auth.currentUser) {
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         await signInWithCustomToken(auth, __initial_auth_token);
@@ -1386,199 +563,151 @@
                 }
                 
                 currentUser = auth.currentUser;
+                if (!currentUser) throw new Error("Kein Ticket erhalten.");
+
+                myName = name.substring(0, 12);
+                currentRoom = room;
+                sfx.enable(); 
                 
-                if (currentUser) {
-                    sfx.enable(); 
-                    UIManager.setStatus("🟢 SERVER ONLINE", "text-green-400 border-green-900");
-                    UIManager.switchScreen('screen-room');
-                    
-                    // LOBBY COUNTER
-                    onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'players'), (snapshot) => {
-                        const counts = {"GABRI RAUM": 0, "RAUM DES GABRIS": 0, "GABRILOGIE": 0, "GABRIELS": 0};
-                        const now = Date.now();
-                        snapshot.forEach(doc => { 
-                            const data = doc.data(); 
-                            if (data.roomId && counts[data.roomId] !== undefined && (now - data.lastSeen) < 20000) {
-                                counts[data.roomId]++; 
-                            }
-                        });
-                        document.querySelectorAll('.room-btn').forEach(btn => { 
-                            const rName = btn.getAttribute('data-room'); 
-                            document.getElementById(`count-${rName}`).innerText = `${counts[rName]}/10`; 
-                        });
-                    });
-                } else {
-                    throw new Error("Authentifizierung fehlgeschlagen.");
-                }
-            } catch (e) { 
+                // Set Player initial state
+                myLocalPlayer.x = 1300 + Math.random()*200; myLocalPlayer.y = 1000 + Math.random()*200;
+                camera.x = myLocalPlayer.x - window.innerWidth/2; camera.y = myLocalPlayer.y - window.innerHeight/2;
+
+                await setDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { 
+                    id: currentUser.uid, name: myName, roomId: currentRoom, x: myLocalPlayer.x, y: myLocalPlayer.y, timeAsGabri: 0, lastSeen: Date.now(), isStealth: false 
+                });
+
+                startFirebaseListeners();
+                
+                // Hide Login, Show HUD
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('game-hud').style.display = 'block';
+                document.getElementById('currentRoomDisplay').innerText = currentRoom;
+                isGameRunning = true;
+                lastUpdateTime = performance.now();
+                requestAnimationFrame(gameLoop);
+
+            } catch (e) {
                 console.error(e);
-                UIManager.setStatus("🔴 FEHLER: " + e.message, "text-red-400 border-red-900");
-                btn.innerText = "ERNEUT VERSUCHEN"; 
-                btn.disabled = false; 
+                errBox.innerText = "FEHLER: " + e.message; errBox.style.display = 'block';
+                btn.innerText = "SPIELEN"; btn.disabled = false;
             }
         });
 
-        document.querySelectorAll('.room-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                sfx.enable(); 
-                sfx.sfxAlert();
-                currentRoomId = e.currentTarget.getAttribute('data-room');
-                document.getElementById('lobbyTitleCode').innerText = currentRoomId;
-
-                myLocalPlayer.x = 1300 + Math.random()*100; 
-                myLocalPlayer.y = 1000 + Math.random()*100;
-                camera.x = myLocalPlayer.x - window.innerWidth/2; 
-                camera.y = myLocalPlayer.y - window.innerHeight/2;
-
-                const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid);
-                setDoc(playerRef, { 
-                    id: currentUser.uid, 
-                    name: myName, 
-                    roomId: currentRoomId, 
-                    x: myLocalPlayer.x, 
-                    y: myLocalPlayer.y, 
-                    timeAsGabri: 0, 
-                    lastSeen: Date.now(), 
-                    isStealth: false 
-                });
-
-                setupFirebaseListeners();
-                startGameLoop();
-                UIManager.switchScreen('screen-lobby');
-            });
-        });
-
-        let playersUnsubscribe = null, roomUnsubscribe = null;
-        
-        function setupFirebaseListeners() {
-            if (!currentUser || !currentRoomId) return; 
-            
-            const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-
-            // SYNC PLAYERS
-            if (playersUnsubscribe) playersUnsubscribe();
-            playersUnsubscribe = onSnapshot(playersRef, (snapshot) => {
+        // ============================================================================
+        // 8. GAME SYNC & LOOP
+        // ============================================================================
+        function startFirebaseListeners() {
+            // 1. Players Sync
+            onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'players'), (snapshot) => {
                 const localNow = performance.now();
                 snapshot.docChanges().forEach(change => {
-                    const docData = change.doc.data(); 
-                    const docId = change.doc.id;
-                    
-                    if (docData.roomId === currentRoomId) {
+                    const data = change.doc.data(); const id = change.doc.id;
+                    if (data.roomId === currentRoom) {
                         if (change.type === 'added' || change.type === 'modified') {
-                            if (!serverPlayers[docId]) {
-                                serverPlayers[docId] = docData;
-                                if (docId !== currentUser.uid) gameEntities[docId] = { x: docData.x, y: docData.y };
-                            } else {
-                                Object.assign(serverPlayers[docId], docData);
-                            }
-                            serverPlayers[docId].localLastUpdate = localNow; 
+                            if (!serverPlayers[id]) { serverPlayers[id] = data; if (id !== currentUser.uid) gameEntities[id] = { x: data.x, y: data.y }; } 
+                            else { Object.assign(serverPlayers[id], data); }
+                            serverPlayers[id].localLastUpdate = localNow; 
                         }
-                        if (change.type === 'removed') { 
-                            delete serverPlayers[docId]; 
-                            delete gameEntities[docId]; 
-                        }
+                        if (change.type === 'removed') { delete serverPlayers[id]; delete gameEntities[id]; }
                     }
                 });
-                UIManager.updateLobby();
+                
+                // Update HUD Player List
+                let activeIds = Object.keys(serverPlayers).sort();
+                let lbContent = "";
+                for(let id in serverPlayers) {
+                    const p = serverPlayers[id];
+                    let t = (p.timeAsGabri || 0); if (localCurrentGabri === id && gameState.isPlaying) t += (Date.now() - localGabriSince);
+                    lbContent += `<div class="lb-row"><span style="color:${id===currentUser.uid?'#00ffcc':'white'}">${p.name}</span><span>${(t/1000).toFixed(1)}s</span></div>`;
+                }
+                document.getElementById('lb-content').innerHTML = lbContent;
+                
+                // Update Host Button
+                let isHost = activeIds[0] === currentUser?.uid;
+                const btnStart = document.getElementById('btnStartRound');
+                if (gameState.isPlaying) {
+                    btnStart.style.display = 'none';
+                } else {
+                    btnStart.style.display = 'block';
+                    btnStart.innerText = isHost ? "RUNDE STARTEN" : "WARTE AUF HOST...";
+                    btnStart.disabled = !isHost;
+                    btnStart.style.background = isHost ? 'var(--primary)' : '#555';
+                }
             });
 
-            // SYNC ROOM / GAME STATE
-            if (roomUnsubscribe) roomUnsubscribe();
-            roomUnsubscribe = onSnapshot(roomRef, (docSnap) => {
+            // 2. Room Sync
+            onSnapshot(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), (docSnap) => {
                 if (docSnap.exists()) {
                     const newState = docSnap.data();
                     
-                    // Host Migration 
                     if (newState.isPlaying && newState.hostId !== currentUser.uid) {
                         const hostAlive = serverPlayers[newState.hostId] && (performance.now() - serverPlayers[newState.hostId].localLastUpdate < 20000);
                         if (!hostAlive) {
                             const activeIds = Object.keys(serverPlayers).sort();
-                            if (activeIds[0] === currentUser.uid) updateDoc(roomRef, { hostId: currentUser.uid });
+                            if (activeIds[0] === currentUser.uid) updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { hostId: currentUser.uid });
                         }
                     }
 
                     if (newState.isPlaying && newState.roundId !== currentRoundId) {
-                        currentRoundId = newState.roundId; 
-                        localCurrentGabri = newState.currentGabri; 
-                        localGabriSince = Date.now(); 
-                        localTagCounter = newState.tagCounter;
-                        myLocalPlayer.x = 1300 + Math.random()*100; 
-                        myLocalPlayer.y = 1000 + Math.random()*100;
-                        
+                        currentRoundId = newState.roundId; localCurrentGabri = newState.currentGabri; localGabriSince = Date.now(); localTagCounter = newState.tagCounter;
+                        myLocalPlayer.x = 1300 + Math.random()*100; myLocalPlayer.y = 1000 + Math.random()*100;
                     } else if (newState.isPlaying && newState.tagCounter !== localTagCounter) {
-                        localTagCounter = newState.tagCounter; 
-                        localCurrentGabri = newState.currentGabri; 
-                        localGabriSince = Date.now();
-                        sfx.sfxTag(); 
+                        localTagCounter = newState.tagCounter; localCurrentGabri = newState.currentGabri; localGabriSince = Date.now(); sfx.sfxTag(); 
                     }
                     
                     if (newState.lastScoreTs !== gameState.lastScoreTs && newState.lastScoreTs > lastScoreTs) {
-                        lastScoreTs = newState.lastScoreTs; 
-                        sfx.sfxScore(); 
-                        sfx.sfxCheer();
+                        lastScoreTs = newState.lastScoreTs; sfx.sfxScore(); sfx.sfxCheer();
                     }
 
                     if (newState[`knockback_${currentUser.uid}`] && newState[`knockback_${currentUser.uid}`].ts !== lastKnockbackTs) {
                         lastKnockbackTs = newState[`knockback_${currentUser.uid}`].ts;
-                        kb_vx = newState[`knockback_${currentUser.uid}`].vx; 
-                        kb_vy = newState[`knockback_${currentUser.uid}`].vy; 
-                        Physics.spawnParticles(myLocalPlayer.x, myLocalPlayer.y, '#ff0000'); 
+                        kb_vx = newState[`knockback_${currentUser.uid}`].vx; kb_vy = newState[`knockback_${currentUser.uid}`].vy; 
+                        for(let i=0; i<10; i++) particles.push({x: myLocalPlayer.x+20, y: myLocalPlayer.y+20, vx: (Math.random() - 0.5) * 400, vy: (Math.random() - 0.5) * 400, life: 1.0, color: '#ff0000' });
                         sfx.playNoise(0.2, 0.8);
                     }
 
-                    // Item Sync Check
                     if (myHeldItem === 'ball' && newState.ball_owner !== currentUser.uid) myHeldItem = null;
                     if (myHeldItem === 'mg' && newState.mg_owner !== currentUser.uid) myHeldItem = null;
                     if (myHeldItem && myHeldItem.startsWith('sword') && newState[myHeldItem+'_owner'] !== currentUser.uid) myHeldItem = null;
 
                     if (newState.ball_ts !== lastBallTs) {
-                        lastBallTs = newState.ball_ts; 
-                        localBall.active = true;
-                        localBall.x = newState.ball_x; 
-                        localBall.y = newState.ball_y;
-                        localBall.vx = newState.ball_vx || 0; 
-                        localBall.vy = newState.ball_vy || 0;
-                        localBall.z = 40; 
-                        localBall.vz = 350; 
+                        lastBallTs = newState.ball_ts; localBall.active = true;
+                        localBall.x = newState.ball_x; localBall.y = newState.ball_y;
+                        localBall.vx = newState.ball_vx || 0; localBall.vy = newState.ball_vy || 0;
+                        localBall.z = 40; localBall.vz = 350; 
                     } else if (newState.ball_owner == null && !localBall.active) {
-                        localBall.active = true; 
-                        localBall.x = newState.ball_x; 
-                        localBall.y = newState.ball_y; 
-                        localBall.z = 0; 
-                        localBall.vx = 0; 
-                        localBall.vy = 0;
+                        localBall.active = true; localBall.x = newState.ball_x; localBall.y = newState.ball_y; localBall.z = 0; localBall.vx = 0; localBall.vy = 0;
                     }
 
-                    gameState = newState; 
-                    handleStateChange();
-                } else { 
-                    gameState.isPlaying = false; 
-                    handleStateChange(); 
-                }
+                    gameState = newState;
+                    
+                    // UI Update
+                    if (gameState.isPlaying) {
+                        document.getElementById('btnStartRound').style.display = 'none';
+                        if (localCurrentGabri === currentUser.uid) {
+                            document.getElementById('hudStatusBox').classList.add('is-gabri-alert'); 
+                            document.getElementById('roleDisplay').innerText = "DU BIST GABRI!";
+                        } else {
+                            document.getElementById('hudStatusBox').classList.remove('is-gabri-alert');
+                            const gName = serverPlayers[localCurrentGabri]?.name || "Jemand"; 
+                            document.getElementById('roleDisplay').innerHTML = `<span style="color:var(--primary)">LAUF! ${gName} ist Gabri!</span>`;
+                        }
+                    } else {
+                        document.getElementById('gameTimer').innerText = "WARMUP";
+                        document.getElementById('roleDisplay').innerText = "Erkunde die Map";
+                        document.getElementById('hudStatusBox').classList.remove('is-gabri-alert');
+                    }
+                    
+                } else { gameState.isPlaying = false; }
             });
         }
 
-        // GLOBAL HEARTBEAT (LOBBY SYNC FIX)
-        setInterval(() => {
-            if (currentUser && currentRoomId && Date.now() - lastHeartbeatTs > 2000) {
-                lastHeartbeatTs = Date.now();
-                updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid), { lastSeen: lastHeartbeatTs }).catch(()=>{});
-            }
-        }, 2000);
-
-        document.getElementById('btnForceReset').addEventListener('click', () => {
-            if (!currentRoomId) return; 
-            updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId), { isPlaying: false, hostId: null });
-        });
-
-        document.getElementById('btnStartGame').addEventListener('click', async () => {
-            if (!currentUser || !currentRoomId) return;
+        document.getElementById('btnStartRound').addEventListener('click', async () => {
+            if (!currentUser || !currentRoom) return;
             try {
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-                const activeIds = Object.keys(serverPlayers); 
-                if(activeIds.length === 0) activeIds.push(currentUser.uid);
-                
+                const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom);
+                const activeIds = Object.keys(serverPlayers); if(activeIds.length === 0) activeIds.push(currentUser.uid);
                 const randomGabri = activeIds[Math.floor(Math.random() * activeIds.length)];
 
                 let initialItems = {};
@@ -1590,465 +719,228 @@
                 initialItems['sword3_x'] = swordBases['sword3'].x; initialItems['sword3_y'] = swordBases['sword3'].y;
                 initialItems['sword4_x'] = swordBases['sword4'].x; initialItems['sword4_y'] = swordBases['sword4'].y;
 
-                // SAFER START MECHANISM (Timer relies on Host updates)
                 await setDoc(roomRef, {
-                    ...initialItems, 
-                    isPlaying: true, 
-                    roundId: Math.random().toString(36).substring(2, 9),
-                    currentGabri: randomGabri, 
-                    tagCounter: 0, 
-                    hostId: currentUser.uid, 
+                    ...initialItems, isPlaying: true, roundId: Math.random().toString(36).substring(2, 9),
+                    currentGabri: randomGabri, tagCounter: 0, hostId: currentUser.uid, 
                     timeLeft: GAME_DURATION_SEC, 
-                    
                     ball_x: 2200, ball_y: 1500, ball_vx: 0, ball_vy: 0, ball_owner: null, ball_ts: 0, lastScoreTs: 0,
                     boss_active: false, boss_hp: 500, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
                     sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null,
                     mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null, dead_npcs: {} 
                 });
 
-                for(let id of activeIds) {
-                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', id), { timeAsGabri: 0, lastSeen: Date.now() });
-                }
-            } catch (error) { 
-                alert("Start Fehler: " + error.message); 
-            }
+                for(let id of activeIds) updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', id), { timeAsGabri: 0, lastSeen: Date.now() });
+            } catch (error) { alert("Start Fehler: " + error.message); }
         });
 
-        document.getElementById('btnRestart').addEventListener('click', () => {
-            if (!currentRoomId) return; 
-            updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId), { isPlaying: false });
-        });
-
-        function handleStateChange() {
-            if (gameState.isPlaying && gameState.timeLeft !== undefined) {
-                localTimeLeft = gameState.timeLeft;
+        setInterval(() => {
+            if (currentUser && currentRoom && isGameRunning) {
+                updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { lastSeen: Date.now() }).catch(()=>{});
             }
-
-            if (gameState.isPlaying && localTimeLeft > 0) {
-                UIManager.hideScreens(); 
-                document.body.classList.add('game-running'); 
-                
-                if (localCurrentGabri === currentUser.uid) {
-                    document.getElementById('hudStatusBox').classList.add('is-gabri-alert'); 
-                    document.getElementById('roleDisplay').innerText = "DU BIST GABRI! FANG SIE!";
-                } else {
-                    document.getElementById('hudStatusBox').classList.remove('is-gabri-alert');
-                    const gName = serverPlayers[localCurrentGabri]?.name || "Jemand"; 
-                    document.getElementById('roleDisplay').innerHTML = `<span style="color:var(--primary)">LAUF! ${gName} ist Gabri!</span>`;
-                }
-            } else if (gameState.isPlaying && localTimeLeft <= 0) { 
-                if (UIManager.screens.style.display === 'none') {
-                    UIManager.switchScreen('screen-leaderboard'); 
-                    document.getElementById('ui-layer').style.display = 'none';
-                    
-                    let results = [];
-                    for (let id in serverPlayers) {
-                        let total = serverPlayers[id].timeAsGabri || 0; 
-                        if (localCurrentGabri === id) total += (Date.now() - localGabriSince);
-                        results.push({ name: serverPlayers[id].name, time: total });
-                    }
-                    results.sort((a, b) => b.time - a.time);
-                    
-                    const list = document.getElementById('leaderboardList'); 
-                    list.innerHTML = '';
-                    
-                    results.forEach((r, index) => {
-                        let rowClass = "rank-row"; let medal = "";
-                        if (index === 0) { 
-                            rowClass += " rank-loser"; medal = "💀 VERLIERER"; 
-                        } else if (index === results.length - 1 && results.length > 1) { 
-                            rowClass += " rank-winner"; medal = "👑 GEWINNER"; 
-                        }
-                        list.innerHTML += `<div class="${rowClass}"><span>${index + 1}. ${r.name} <span class="text-xs ml-2 opacity-80">${medal}</span></span><span>${(r.time/1000).toFixed(1)}s</span></div>`;
-                    });
-                }
-                document.body.classList.remove('game-running');
-            } else { 
-                UIManager.switchScreen('screen-lobby'); 
-                document.getElementById('ui-layer').style.display = 'none'; 
-                document.body.classList.remove('game-running');
-            }
-        }
-
-        // ============================================================================
-        // 9. GAME LOOP 
-        // ============================================================================
-        let isGameLoopRunning = false;
-        function startGameLoop() {
-            if(isGameLoopRunning) return;
-            isGameLoopRunning = true; 
-            lastUpdateTime = performance.now(); 
-            requestAnimationFrame(gameLoop);
-        }
+        }, 2000);
 
         function gameLoop(timestamp) {
-            if (!currentRoomId) { 
-                isGameLoopRunning = false; 
-                return; 
-            }
-
-            const dt = Math.min((timestamp - lastUpdateTime) / 1000, 0.1); 
-            lastUpdateTime = timestamp; 
-            const now = Date.now();
+            if (!isGameRunning) return;
+            const dt = Math.min((timestamp - lastUpdateTime) / 1000, 0.1); lastUpdateTime = timestamp; const now = Date.now();
 
             if (currentUser) {
-                // CLEANUP OFFLINE PLAYERS
-                const localNow = performance.now(); 
-                let dirtyLobby = false;
-                for (let id in serverPlayers) { 
-                    if (id !== currentUser.uid && localNow - serverPlayers[id].localLastUpdate > 15000) { 
-                        delete serverPlayers[id]; 
-                        delete gameEntities[id]; 
-                        dirtyLobby = true; 
-                    } 
-                }
-                if (dirtyLobby) UIManager.updateLobby();
-
-                // HOST TASKS (Timer Sync & Boss Logic)
-                if (gameState.isPlaying && localTimeLeft > 0) {
-                    if (gameState.hostId === currentUser.uid && now - lastHostTick > 1000) {
-                        lastHostTick = now; 
-                        let updates = { timeLeft: gameState.timeLeft - 1 };
-                        
-                        if (updates.timeLeft <= 60 && !gameState.boss_active && gameState.boss_hp > 0 && !gameState.mg_dropped) { 
-                            updates.boss_active = true; 
-                            sfx.sfxAlert(); 
-                        }
-                        
-                        if (gameState.boss_active && gameState.boss_hp <= 0 && !gameState.mg_dropped) {
-                            updates.boss_active = false; 
-                            updates.mg_dropped = true; 
-                            updates.mg_x = gameState.boss_x + 60; 
-                            updates.mg_y = gameState.boss_y + 60; 
-                            sfx.playTone(200, 'square', 1.0);
-                        }
-                        
-                        if (gameState.boss_active && gameState.boss_hp > 0) {
-                            let nearestId = null; let minDist = 9999;
-                            for (let id in serverPlayers) {
-                                if (serverPlayers[id].y > 2000 && !serverPlayers[id].isStealth) {
-                                    let d = Math.hypot(serverPlayers[id].x - gameState.boss_x, serverPlayers[id].y - gameState.boss_y); 
-                                    if (d < minDist) { minDist = d; nearestId = id; }
-                                }
-                            }
-                            if (nearestId) {
-                                const target = serverPlayers[nearestId]; 
-                                const angle = Math.atan2(target.y - gameState.boss_y, target.x - gameState.boss_x);
-                                updates.boss_tx = gameState.boss_x + Math.cos(angle) * 180; 
-                                updates.boss_ty = gameState.boss_y + Math.sin(angle) * 180; 
-                                updates.boss_x = updates.boss_tx; 
-                            }
-                        }
-                        
-                        if (Object.keys(updates).length > 0) {
-                            updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId), updates).catch(()=>{});
-                        }
-                    }
-                }
-
-                // GAMEPLAY TASKS
-                if (gameState.isPlaying && localTimeLeft > 0 && UIManager.screens.style.display === 'none') {
+                // Host Logic
+                if (gameState.isPlaying && gameState.hostId === currentUser.uid && now - lastHostTick > 1000) {
+                    lastHostTick = now; let updates = { timeLeft: Math.max(0, gameState.timeLeft - 1) };
                     
-                    const move = Input.getVector();
-                    if (dashSpeedMult > 1.0) { dashSpeedMult -= dt * 6; if (dashSpeedMult < 1.0) dashSpeedMult = 1.0; }
-                    if (now > energyDrinkEndTime) activeSpeedMult = 1.0;
-
-                    let mx = (move.dx * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vx) * dt;
-                    let my = (move.dy * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vy) * dt;
-                    kb_vx *= 0.85; kb_vy *= 0.85; 
-
-                    // Stealth Mode
-                    if (Math.abs(move.dx) < 0.1 && Math.abs(move.dy) < 0.1 && Math.abs(kb_vx) < 10 && Math.abs(kb_vy) < 10) {
-                        timeStandingStill += dt;
-                    } else {
-                        timeStandingStill = 0; 
-                        const len = Math.hypot(move.dx, move.dy); 
-                        if (len > 0) myFacing = { x: move.dx/len, y: move.dy/len };
+                    if (updates.timeLeft <= 60 && !gameState.boss_active && gameState.boss_hp > 0 && !gameState.mg_dropped) { updates.boss_active = true; sfx.sfxAlert(); }
+                    if (gameState.boss_active && gameState.boss_hp <= 0 && !gameState.mg_dropped) {
+                        updates.boss_active = false; updates.mg_dropped = true; updates.mg_x = gameState.boss_x + 60; updates.mg_y = gameState.boss_y + 60; sfx.playTone(200, 'square', 1.0);
                     }
-                    
-                    let newStealth = timeStandingStill > 2.0;
-                    if (newStealth !== isStealthMode) { 
-                        isStealthMode = newStealth; 
-                        updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid), { isStealth: isStealthMode }).catch(()=>{}); 
-                    }
-
-                    // ANTI STUCK COLLISION SYSTEM
-                    let steps = 5; 
-                    let stepX = mx / steps; 
-                    let stepY = my / steps;
-                    
-                    for(let i=0; i<steps; i++) {
-                        if (!Physics.checkWall(myLocalPlayer.x + stepX, myLocalPlayer.y)) {
-                            myLocalPlayer.x += stepX; 
-                        } else { kb_vx = 0; }
-                        
-                        if (!Physics.checkWall(myLocalPlayer.x, myLocalPlayer.y + stepY)) {
-                            myLocalPlayer.y += stepY; 
-                        } else { kb_vy = 0; }
-                    }
-                    
-                    // Check Stairs
-                    if (now - lastStairTime >= 1000) {
-                        for (let s of stairs) {
-                            if (myLocalPlayer.x < s.x + s.w && myLocalPlayer.x + PLAYER_SIZE > s.x && myLocalPlayer.y < s.y + s.h && myLocalPlayer.y + PLAYER_SIZE > s.y) {
-                                myLocalPlayer.y = s.targetY; 
-                                lastStairTime = now; 
-                                Physics.spawnParticles(myLocalPlayer.x, myLocalPlayer.y, '#00ffcc'); 
-                                sfx.sfxDash(); 
-                                break;
-                            }
-                        }
-                    }
-
-                    // Boss Knockback Local Hit
-                    if (gameState.boss_active && gameState.boss_hp > 0 && myLocalPlayer.y > 2000) {
-                        if (Math.hypot(myLocalPlayer.x - gameState.boss_x, myLocalPlayer.y - gameState.boss_y) < 100 && !isStealthMode) {
-                            // FIX: Away from Boss instead of Facing to avoid Stuck
-                            const angleFromBoss = Math.atan2(myLocalPlayer.y - gameState.boss_y, myLocalPlayer.x - gameState.boss_x);
-                            kb_vx = Math.cos(angleFromBoss) * 3000; 
-                            kb_vy = Math.sin(angleFromBoss) * 3000; 
-                            Physics.spawnParticles(myLocalPlayer.x + 20, myLocalPlayer.y + 20, '#ff0000'); 
-                            sfx.playNoise(0.3, 1.0);
-                        }
-                    }
-
-                    // LOCAL BALL PHYSICS
-                    if (!gameState.ball_owner && localBall.active) {
-                        let bnx = localBall.x + localBall.vx * dt; 
-                        let bny = localBall.y + localBall.vy * dt;
-                        let hitX = Physics.checkWall(bnx, localBall.y); 
-                        let hitY = Physics.checkWall(localBall.x, bny);
-                        
-                        if (hitX) { localBall.vx *= -0.7; sfx.sfxBounce(); } else localBall.x = bnx;
-                        if (hitY) { localBall.vy *= -0.7; sfx.sfxBounce(); } else localBall.y = bny;
-                        
-                        localBall.vx *= 0.98; localBall.vy *= 0.98; 
-                        localBall.vz -= 800 * dt; 
-                        localBall.z += localBall.vz * dt;
-                        
-                        if (localBall.z < 0) {
-                            localBall.z = 0; 
-                            if (localBall.vz < -50) { 
-                                localBall.vz *= -0.6; 
-                                sfx.sfxBounce(); 
-                            } else { 
-                                localBall.vz = 0; localBall.vx *= 0.9; localBall.vy *= 0.9; 
-                            }
-                        }
-
-                        if (localBall.z > 80 && Math.hypot(localBall.x - (hoop.x + hoop.w/2), localBall.y - (hoop.y + 10)) < 40) {
-                            if (now - lastConfettiTs > 1000) {
-                                Physics.spawnConfetti(hoop.x + hoop.w/2, hoop.y + 10); 
-                                lastConfettiTs = now; 
-                                lastScoreTs = now; 
-                                updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId), { lastScoreTs: now }); 
-                            }
-                        }
-                    }
-
-                    // CAMERA LERP
-                    const targetCamX = myLocalPlayer.x + PLAYER_SIZE/2 - canvas.width/2; 
-                    const targetCamY = myLocalPlayer.y + PLAYER_SIZE/2 - canvas.height/2;
-                    camera.x += (targetCamX - camera.x) * 10 * dt;
-                    if (Math.abs(targetCamY - camera.y) > 1000) camera.y = targetCamY; 
-                    else camera.y += (targetCamY - camera.y) * 10 * dt;
-                    
-                    camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width)); 
-                    camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
-
-                    // ENTITY INTERPOLATION
-                    for(let id in serverPlayers) {
-                        if (id !== currentUser.uid && gameEntities[id]) {
-                            if (Math.abs(serverPlayers[id].y - gameEntities[id].y) > 1000) {
-                                gameEntities[id].y = serverPlayers[id].y;
-                            } else {
-                                gameEntities[id].y += (serverPlayers[id].y - gameEntities[id].y) * 15 * dt;
-                            }
-                            gameEntities[id].x += (serverPlayers[id].x - gameEntities[id].x) * 15 * dt;
-                        }
-                    }
-
-                    // SYNC POS
-                    if (now - lastSyncTime > 100) { 
-                        lastSyncTime = now;
-                        updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid), { 
-                            x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y), roomId: currentRoomId 
-                        }).catch(()=>{});
-                    }
-
-                    // TAG CHECK
-                    if (localCurrentGabri === currentUser.uid && now >= localGabriSince + TAG_COOLDOWN_MS) {
+                    if (gameState.boss_active && gameState.boss_hp > 0) {
+                        let nearestId = null; let minDist = 9999;
                         for (let id in serverPlayers) {
-                            if (id === currentUser.uid) continue;
-                            const p = gameEntities[id] || serverPlayers[id]; 
-                            if (serverPlayers[id].isStealth) continue; 
-                            
-                            if (Math.hypot((p.x+PLAYER_SIZE/2) - (myLocalPlayer.x+PLAYER_SIZE/2), (p.y+PLAYER_SIZE/2) - (myLocalPlayer.y+PLAYER_SIZE/2)) < PLAYER_SIZE * 0.9) { 
-                                Physics.spawnParticles(p.x, p.y, '#ff3366'); 
-                                try {
-                                    Promise.all([
-                                        updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid), { timeAsGabri: increment(now - localGabriSince) }),
-                                        updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId), { currentGabri: id, tagCounter: increment(1) })
-                                    ]);
-                                } catch(e) {}
-                                break;
+                            if (serverPlayers[id].y > 2000 && !serverPlayers[id].isStealth) {
+                                let d = Math.hypot(serverPlayers[id].x - gameState.boss_x, serverPlayers[id].y - gameState.boss_y); if (d < minDist) { minDist = d; nearestId = id; }
                             }
                         }
+                        if (nearestId) {
+                            const target = serverPlayers[nearestId]; const angle = Math.atan2(target.y - gameState.boss_y, target.x - gameState.boss_x);
+                            updates.boss_tx = gameState.boss_x + Math.cos(angle) * 180; updates.boss_ty = gameState.boss_y + Math.sin(angle) * 180; updates.boss_x = updates.boss_tx; 
+                        }
                     }
-
-                    // UPDATE HUD
-                    const min = Math.floor(localTimeLeft / 60); 
-                    const sec = localTimeLeft % 60;
-                    document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
-                    
-                    let myTotal = serverPlayers[currentUser.uid]?.timeAsGabri || 0; 
-                    if (localCurrentGabri === currentUser.uid) myTotal += (now - localGabriSince);
-                    document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(myTotal/1000).toFixed(1)}s`;
-                    
-                    floorDisplay.innerText = myLocalPlayer.y > 2000 ? "OBERGESCHOSS (OG)" : "ERDGESCHOSS (EG)";
-                
-                    render(dt, now);
+                    if (updates.timeLeft <= 0) updates.isPlaying = false; // Game Over
+                    if (Object.keys(updates).length > 0) updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), updates).catch(()=>{});
                 }
+
+                // Player Logic (Runs even in Warmup!)
+                const move = Input.getVector();
+                if (dashSpeedMult > 1.0) { dashSpeedMult -= dt * 6; if (dashSpeedMult < 1.0) dashSpeedMult = 1.0; }
+                if (now > energyDrinkEndTime) activeSpeedMult = 1.0;
+
+                let mx = (move.dx * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vx) * dt;
+                let my = (move.dy * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vy) * dt;
+                kb_vx *= 0.85; kb_vy *= 0.85; 
+
+                if (Math.abs(move.dx) < 0.1 && Math.abs(move.dy) < 0.1 && Math.abs(kb_vx) < 10 && Math.abs(kb_vy) < 10) {
+                    timeStandingStill += dt;
+                } else {
+                    timeStandingStill = 0; const len = Math.hypot(move.dx, move.dy); if (len > 0) myFacing = { x: move.dx/len, y: move.dy/len };
+                }
+                
+                let newStealth = timeStandingStill > 2.0;
+                if (newStealth !== isStealthMode) { 
+                    isStealthMode = newStealth; updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { isStealth: isStealthMode }).catch(()=>{}); 
+                }
+
+                let steps = 5; let stepX = mx / steps; let stepY = my / steps;
+                for(let i=0; i<steps; i++) {
+                    if (!Physics.checkWall(myLocalPlayer.x + stepX, myLocalPlayer.y)) myLocalPlayer.x += stepX; else kb_vx = 0;
+                    if (!Physics.checkWall(myLocalPlayer.x, myLocalPlayer.y + stepY)) myLocalPlayer.y += stepY; else kb_vy = 0;
+                }
+                
+                if (now - lastStairTime >= 1000) {
+                    for (let s of stairs) {
+                        if (myLocalPlayer.x < s.x + s.w && myLocalPlayer.x + PLAYER_SIZE > s.x && myLocalPlayer.y < s.y + s.h && myLocalPlayer.y + PLAYER_SIZE > s.y) {
+                            myLocalPlayer.y = s.targetY; lastStairTime = now; for(let i=0;i<10;i++) particles.push({x:myLocalPlayer.x+20,y:myLocalPlayer.y+20,vx:(Math.random()-0.5)*400,vy:(Math.random()-0.5)*400,life:1,color:'#00ffcc'}); sfx.sfxDash(); break;
+                        }
+                    }
+                }
+
+                if (gameState.boss_active && gameState.boss_hp > 0 && myLocalPlayer.y > 2000) {
+                    if (Math.hypot(myLocalPlayer.x - gameState.boss_x, myLocalPlayer.y - gameState.boss_y) < 100 && !isStealthMode) {
+                        const angleFromBoss = Math.atan2(myLocalPlayer.y - gameState.boss_y, myLocalPlayer.x - gameState.boss_x);
+                        kb_vx = Math.cos(angleFromBoss) * 3000; kb_vy = Math.sin(angleFromBoss) * 3000; 
+                        for(let i=0;i<10;i++) particles.push({x:myLocalPlayer.x+20,y:myLocalPlayer.y+20,vx:(Math.random()-0.5)*400,vy:(Math.random()-0.5)*400,life:1,color:'#ff0000'}); sfx.playNoise(0.3, 1.0);
+                    }
+                }
+
+                // Local Ball Physics
+                if (!gameState.ball_owner && localBall.active) {
+                    let bnx = localBall.x + localBall.vx * dt; let bny = localBall.y + localBall.vy * dt;
+                    let hitX = Physics.checkWall(bnx, localBall.y); let hitY = Physics.checkWall(localBall.x, bny);
+                    if (hitX) { localBall.vx *= -0.7; sfx.sfxBounce(); } else localBall.x = bnx;
+                    if (hitY) { localBall.vy *= -0.7; sfx.sfxBounce(); } else localBall.y = bny;
+                    localBall.vx *= 0.98; localBall.vy *= 0.98; localBall.vz -= 800 * dt; localBall.z += localBall.vz * dt;
+                    if (localBall.z < 0) {
+                        localBall.z = 0; if (localBall.vz < -50) { localBall.vz *= -0.6; sfx.sfxBounce(); } else { localBall.vz = 0; localBall.vx *= 0.9; localBall.vy *= 0.9; }
+                    }
+                    if (localBall.z > 80 && Math.hypot(localBall.x - (hoop.x + hoop.w/2), localBall.y - (hoop.y + 10)) < 40) {
+                        if (now - lastConfettiTs > 1000) {
+                            for(let i=0;i<60;i++) particles.push({x:hoop.x+50,y:hoop.y+10,vx:(Math.random()-0.5)*800,vy:(Math.random()-1)*800,life:1.5,color:['#ff3366','#00ffcc','#ffcc00'][Math.floor(Math.random()*3)],isConfetti:true});
+                            lastConfettiTs = now; updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { lastScoreTs: now }); 
+                        }
+                    }
+                }
+
+                // Camera
+                const targetCamX = myLocalPlayer.x + PLAYER_SIZE/2 - canvas.width/2; const targetCamY = myLocalPlayer.y + PLAYER_SIZE/2 - canvas.height/2;
+                camera.x += (targetCamX - camera.x) * 10 * dt;
+                if (Math.abs(targetCamY - camera.y) > 1000) camera.y = targetCamY; else camera.y += (targetCamY - camera.y) * 10 * dt;
+                camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width)); camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
+
+                // Interpolate Others
+                for(let id in serverPlayers) {
+                    if (id !== currentUser.uid && gameEntities[id]) {
+                        if (Math.abs(serverPlayers[id].y - gameEntities[id].y) > 1000) gameEntities[id].y = serverPlayers[id].y;
+                        else gameEntities[id].y += (serverPlayers[id].y - gameEntities[id].y) * 15 * dt;
+                        gameEntities[id].x += (serverPlayers[id].x - gameEntities[id].x) * 15 * dt;
+                    }
+                }
+
+                if (now - lastSyncTime > 100) { 
+                    lastSyncTime = now; updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y) }).catch(()=>{});
+                }
+
+                // Tag Check (Only if playing)
+                if (gameState.isPlaying && localCurrentGabri === currentUser.uid && now >= localGabriSince + TAG_COOLDOWN_MS) {
+                    for (let id in serverPlayers) {
+                        if (id === currentUser.uid) continue;
+                        const p = gameEntities[id] || serverPlayers[id]; if (serverPlayers[id].isStealth) continue; 
+                        if (Math.hypot((p.x+PLAYER_SIZE/2) - (myLocalPlayer.x+PLAYER_SIZE/2), (p.y+PLAYER_SIZE/2) - (myLocalPlayer.y+PLAYER_SIZE/2)) < PLAYER_SIZE * 0.9) { 
+                            for(let i=0;i<10;i++) particles.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*400,vy:(Math.random()-0.5)*400,life:1,color:'#ff3366'});
+                            try { Promise.all([ updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { timeAsGabri: increment(now - localGabriSince) }), updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { currentGabri: id, tagCounter: increment(1) }) ]); } catch(e) {}
+                            break;
+                        }
+                    }
+                }
+
+                if (gameState.isPlaying) {
+                    const min = Math.floor(gameState.timeLeft / 60); const sec = gameState.timeLeft % 60;
+                    document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+                }
+                
+                document.getElementById('floorDisplay').innerText = myLocalPlayer.y > 2000 ? "OBERGESCHOSS (OG)" : "ERDGESCHOSS (EG)";
+                drawFrame(dt, now);
             }
             requestAnimationFrame(gameLoop);
         }
 
-        // ============================================================================
+        // ----------------------------------------------------------------------
         // 10. RENDERER
-        // ============================================================================
-        function render(dt, nowTime) {
-            // Update NPC Physics
+        // ----------------------------------------------------------------------
+        function drawFrame(dt, nowTime) {
             npcs.forEach(npc => {
                 if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) return;
-                
-                let s = npc.speed; 
-                if (localTimeLeft > 0 && localTimeLeft <= 30 && npc.type === 'student') s *= 3; // Zombies are fast
-                
-                let nx = npc.currentX + npc.dirX * s * dt * 1000;
-                let ny = npc.currentY + npc.dirY * s * dt * 1000;
-                
-                if (!Physics.checkWall(nx, npc.currentY)) { 
-                    npc.currentX = nx; 
-                } else { 
-                    npc.dirX *= -1; 
-                    npc.dirY = (Math.random()>0.5?1:-1); 
-                }
-                
-                if (!Physics.checkWall(npc.currentX, ny)) { 
-                    npc.currentY = ny; 
-                } else { 
-                    npc.dirY *= -1; 
-                    npc.dirX = (Math.random()>0.5?1:-1); 
-                }
+                let s = npc.speed; if (gameState.isPlaying && gameState.timeLeft > 0 && gameState.timeLeft <= 30 && npc.type === 'student') s *= 3; 
+                let nx = npc.currentX + npc.dirX * s * dt * 1000; let ny = npc.currentY + npc.dirY * s * dt * 1000;
+                if (!Physics.checkWall(nx, npc.currentY)) { npc.currentX = nx; } else { npc.dirX *= -1; npc.dirY = (Math.random()>0.5?1:-1); }
+                if (!Physics.checkWall(npc.currentX, ny)) { npc.currentY = ny; } else { npc.dirY *= -1; npc.dirX = (Math.random()>0.5?1:-1); }
             });
 
             const isInOG = camera.y > 1500;
-            ctx.fillStyle = isInOG ? '#0b111a' : '#0d0d12'; 
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = isInOG ? '#0b111a' : '#0d0d12'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.save(); ctx.translate(-camera.x, -camera.y);
 
-            ctx.save(); 
-            ctx.translate(-camera.x, -camera.y);
-
-            // Floor Grid
-            ctx.strokeStyle = 'rgba(255,255,255,0.03)'; 
-            ctx.lineWidth = 2; 
-            const gridSize = 100;
-            const startX = Math.floor(camera.x / gridSize) * gridSize; 
-            const startY = Math.floor(camera.y / gridSize) * gridSize;
-            
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 2; const gridSize = 100;
+            const startX = Math.floor(camera.x / gridSize) * gridSize; const startY = Math.floor(camera.y / gridSize) * gridSize;
             ctx.beginPath();
-            for(let x = startX; x < camera.x + canvas.width; x += gridSize) {
-                if(x >= 0 && x <= MAP_WIDTH) { ctx.moveTo(x, 0); ctx.lineTo(x, MAP_HEIGHT); }
-            }
-            for(let y = startY; y < camera.y + canvas.height; y += gridSize) {
-                if(y >= 0 && y <= MAP_HEIGHT) { ctx.moveTo(0, y); ctx.lineTo(MAP_WIDTH, y); }
-            }
+            for(let x = startX; x < camera.x + canvas.width; x += gridSize) if(x >= 0 && x <= MAP_WIDTH) { ctx.moveTo(x, 0); ctx.lineTo(x, MAP_HEIGHT); }
+            for(let y = startY; y < camera.y + canvas.height; y += gridSize) if(y >= 0 && y <= MAP_HEIGHT) { ctx.moveTo(0, y); ctx.lineTo(MAP_WIDTH, y); }
             ctx.stroke();
 
-            // Stairs
             for(let s of stairs) {
                 if ((isInOG && s.y < 2000) || (!isInOG && s.y > 2000)) continue;
-                ctx.fillStyle = '#222'; 
-                ctx.fillRect(s.x, s.y, s.w, s.h); 
-                ctx.strokeStyle = '#ffcc00'; 
-                ctx.lineWidth = 4; 
-                ctx.strokeRect(s.x, s.y, s.w, s.h);
-                
-                ctx.beginPath(); 
-                for(let i=0; i<10; i++) { 
-                    ctx.moveTo(s.x, s.y + (i * s.h/10)); 
-                    ctx.lineTo(s.x + s.w, s.y + (i * s.h/10)); 
-                } 
-                ctx.stroke();
-                
-                ctx.fillStyle = 'rgba(0,0,0,0.7)'; 
-                ctx.fillRect(s.x, s.y + s.h/2 - 15, s.w, 30);
-                ctx.fillStyle = '#ffcc00'; 
-                ctx.font = '14px "Press Start 2P"'; 
-                ctx.textAlign = 'center'; 
-                ctx.textBaseline = 'middle'; 
-                ctx.fillText(s.label, s.x + s.w/2, s.y + s.h/2);
+                ctx.fillStyle = '#222'; ctx.fillRect(s.x, s.y, s.w, s.h); ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 4; ctx.strokeRect(s.x, s.y, s.w, s.h);
+                ctx.beginPath(); for(let i=0; i<10; i++) { ctx.moveTo(s.x, s.y + (i * s.h/10)); ctx.lineTo(s.x + s.w, s.y + (i * s.h/10)); } ctx.stroke();
+                ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(s.x, s.y + s.h/2 - 15, s.w, 30);
+                ctx.fillStyle = '#ffcc00'; ctx.font = '14px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s.label, s.x + s.w/2, s.y + s.h/2);
             }
 
-            // Static Objects
             for(let obs of obstacles) {
                 if (obs.x + (obs.w||0) < camera.x - 200 || obs.x > camera.x + canvas.width + 200 || obs.y + (obs.h||0) < camera.y - 200 || obs.y > camera.y + canvas.height + 200) continue;
                 if (obs.isWall) {
-                    ctx.fillStyle = '#1a1a24'; ctx.fillRect(obs.x, obs.y, obs.w, obs.h); 
-                    ctx.strokeStyle = 'rgba(0, 255, 204, 0.4)'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+                    ctx.fillStyle = '#1a1a24'; ctx.fillRect(obs.x, obs.y, obs.w, obs.h); ctx.strokeStyle = 'rgba(0, 255, 204, 0.4)'; ctx.lineWidth = 2; ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
                 } else if (obs.isTable) {
-                    ctx.fillStyle = '#5D4037'; ctx.fillRect(obs.x, obs.y, obs.w, obs.h); 
-                    ctx.strokeStyle = '#3E2723'; ctx.lineWidth = 3; ctx.strokeRect(obs.x+1, obs.y+1, obs.w-2, obs.h-2);
+                    ctx.fillStyle = '#5D4037'; ctx.fillRect(obs.x, obs.y, obs.w, obs.h); ctx.strokeStyle = '#3E2723'; ctx.lineWidth = 3; ctx.strokeRect(obs.x+1, obs.y+1, obs.w-2, obs.h-2);
                 } else if (obs.isChair) {
-                    ctx.fillStyle = '#4E342E'; ctx.fillRect(obs.x, obs.y, obs.w, obs.h); 
-                    ctx.fillStyle = '#3E2723';
+                    ctx.fillStyle = '#4E342E'; ctx.fillRect(obs.x, obs.y, obs.w, obs.h); ctx.fillStyle = '#3E2723';
                     if (obs.dir === 'up') ctx.fillRect(obs.x, obs.y, obs.w, 5); else ctx.fillRect(obs.x, obs.y + obs.h - 5, obs.w, 5);
                 }
             }
 
-            // Interactive Map Objects (Drinks & Pallets)
             for(let d of spawnDrinks) {
                 if (gameState.energy_drinks && gameState.energy_drinks[d.id]) continue;
                 if ((isInOG && d.y < 2000) || (!isInOG && d.y > 2000)) continue;
-                ctx.fillStyle = '#0055ff'; ctx.fillRect(d.x, d.y, 8, 12); 
-                ctx.fillStyle = '#silver'; ctx.fillRect(d.x, d.y - 2, 8, 2);
+                ctx.fillStyle = '#0055ff'; ctx.fillRect(d.x, d.y, 8, 12); ctx.fillStyle = '#silver'; ctx.fillRect(d.x, d.y - 2, 8, 2);
             }
             
             for(let p of mapPallets) {
                 const pState = gameState['pallet_'+p.id] || 0;
-                if (pState === 0) { 
-                    ctx.fillStyle = '#5c3a21'; ctx.fillRect(p.upRect.x, p.upRect.y, p.upRect.w, p.upRect.h); 
-                } else if (pState === 1) { 
-                    ctx.fillStyle = '#8b5a2b'; ctx.fillRect(p.dropRect.x, p.dropRect.y, p.dropRect.w, p.dropRect.h); 
-                    ctx.fillStyle = '#5c3a21';
-                    if (p.dropRect.w > p.dropRect.h) { 
-                        for(let i=0; i<5; i++) ctx.fillRect(p.dropRect.x + i*40 + 10, p.dropRect.y, 10, p.dropRect.h); 
-                    } else { 
-                        for(let i=0; i<5; i++) ctx.fillRect(p.dropRect.x, p.dropRect.y + i*40 + 10, p.dropRect.w, 10); 
-                    }
+                if (pState === 0) { ctx.fillStyle = '#5c3a21'; ctx.fillRect(p.upRect.x, p.upRect.y, p.upRect.w, p.upRect.h); } 
+                else if (pState === 1) { 
+                    ctx.fillStyle = '#8b5a2b'; ctx.fillRect(p.dropRect.x, p.dropRect.y, p.dropRect.w, p.dropRect.h); ctx.fillStyle = '#5c3a21';
+                    if (p.dropRect.w > p.dropRect.h) { for(let i=0; i<5; i++) ctx.fillRect(p.dropRect.x + i*40 + 10, p.dropRect.y, 10, p.dropRect.h); } 
+                    else { for(let i=0; i<5; i++) ctx.fillRect(p.dropRect.x, p.dropRect.y + i*40 + 10, p.dropRect.w, 10); }
                 } else if (pState === 2) { 
-                    ctx.fillStyle = '#8b5a2b'; 
-                    ctx.fillRect(p.dropRect.x + 10, p.dropRect.y + 10, 20, 10); 
-                    ctx.fillRect(p.dropRect.x + p.dropRect.w - 30, p.dropRect.y + p.dropRect.h - 20, 20, 10);
+                    ctx.fillStyle = '#8b5a2b'; ctx.fillRect(p.dropRect.x + 10, p.dropRect.y + 10, 20, 10); ctx.fillRect(p.dropRect.x + p.dropRect.w - 30, p.dropRect.y + p.dropRect.h - 20, 20, 10);
                 }
             }
 
-            // Hoop & Labels
-            if (!isInOG) { 
-                ctx.fillStyle = '#ffffff'; ctx.fillRect(hoop.x, hoop.y - 10, hoop.w, 10); 
-                ctx.strokeStyle = '#ff6600'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(hoop.x + hoop.w/2, hoop.y + 10, 30, 0, Math.PI*2); ctx.stroke(); 
-            }
-
+            if (!isInOG) { ctx.fillStyle = '#ffffff'; ctx.fillRect(hoop.x, hoop.y - 10, hoop.w, 10); ctx.strokeStyle = '#ff6600'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(hoop.x + hoop.w/2, hoop.y + 10, 30, 0, Math.PI*2); ctx.stroke(); }
             for(let l of labels) {
                 if (l.x < camera.x - 200 || l.x > camera.x + canvas.width + 200 || l.y < camera.y - 200 || l.y > camera.y + canvas.height + 200) continue;
                 ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.font = 'bold 36px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(l.text, l.x, l.y);
             }
 
-            // NPCs
             for(let npc of npcs) {
                 if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue; 
                 if ((isInOG && npc.currentY < 2000) || (!isInOG && npc.currentY > 2000)) continue;
-
                 ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; ctx.imageSmoothingEnabled = false;
                 
                 let isMoving = Math.abs(npc.dirX) > 0 || Math.abs(npc.dirY) > 0;
@@ -2057,67 +949,45 @@
                 let frame = (isMoving || isDancing) ? Math.floor(nowTime / (isDancing ? 100 : 150)) % 2 : 0;
                 let sprite = texStudent[frame];
                 
-                if (localTimeLeft > 0 && localTimeLeft <= 30 && npc.type === 'student') sprite = texZombie[frame];
+                if (gameState.isPlaying && gameState.timeLeft > 0 && gameState.timeLeft <= 30 && npc.type === 'student') sprite = texZombie[frame];
                 else if (npc.type === 'teacher') sprite = texTeacher[frame];
                 else if (npc.type === 'cheerleader') sprite = texCheer[frame];
 
                 let renderY = npc.currentY;
-                if (isDancing) {
-                    renderY -= Math.abs(Math.sin(nowTime / 100)) * 10; 
-                    if (Math.random() < 0.05) Physics.spawnParticles(npc.currentX + 20, npc.currentY + 40, '#ff66b2', 2); 
-                }
+                if (isDancing) { renderY -= Math.abs(Math.sin(nowTime / 100)) * 10; if (Math.random() < 0.05) { for(let i=0;i<2;i++) particles.push({x:npc.currentX+20,y:npc.currentY+40,vx:(Math.random()-0.5)*400,vy:(Math.random()-0.5)*400,life:1,color:'#ff66b2'}); } }
                 ctx.drawImage(sprite, npc.currentX, renderY, PLAYER_SIZE, PLAYER_SIZE); ctx.shadowBlur = 0;
             }
 
-            // Items (Swords & MG)
             if (isInOG) {
                 for(let i=1; i<=4; i++) {
                     let sKey = 'sword'+i;
                     if (!gameState[sKey+'_owner']) {
-                        let sx = gameState[sKey+'_x'] !== undefined ? gameState[sKey+'_x'] : swordBases[sKey].x; 
-                        let sy = gameState[sKey+'_y'] !== undefined ? gameState[sKey+'_y'] : swordBases[sKey].y;
-                        ctx.fillStyle = '#aaaaaa'; ctx.fillRect(sx, sy, 6, 30); 
-                        ctx.fillStyle = '#ffcc00'; ctx.fillRect(sx-6, sy+20, 18, 6); 
+                        let sx = gameState[sKey+'_x'] !== undefined ? gameState[sKey+'_x'] : swordBases[sKey].x; let sy = gameState[sKey+'_y'] !== undefined ? gameState[sKey+'_y'] : swordBases[sKey].y;
+                        ctx.fillStyle = '#aaaaaa'; ctx.fillRect(sx, sy, 6, 30); ctx.fillStyle = '#ffcc00'; ctx.fillRect(sx-6, sy+20, 18, 6); 
                     }
                 }
             }
 
-            if (isInOG && gameState.mg_dropped && !gameState.mg_owner) { 
-                ctx.fillStyle = '#444'; ctx.fillRect(gameState.mg_x - 15, gameState.mg_y, 30, 8); 
-                ctx.fillStyle = '#222'; ctx.fillRect(gameState.mg_x - 5, gameState.mg_y + 8, 10, 10); 
-            }
+            if (isInOG && gameState.mg_dropped && !gameState.mg_owner) { ctx.fillStyle = '#444'; ctx.fillRect(gameState.mg_x - 15, gameState.mg_y, 30, 8); ctx.fillStyle = '#222'; ctx.fillRect(gameState.mg_x - 5, gameState.mg_y + 8, 10, 10); }
 
-            // Boss Ishin
             if (isInOG && gameState.boss_active && gameState.boss_hp > 0) {
                 let bx = gameState.boss_x; let by = gameState.boss_y;
                 if (gameEntities['boss']) {
-                    gameEntities['boss'].x += (gameState.boss_tx - gameEntities['boss'].x) * 5 * dt;
-                    gameEntities['boss'].y += (gameState.boss_ty - gameEntities['boss'].y) * 5 * dt;
-                    bx = gameEntities['boss'].x; by = gameEntities['boss'].y;
+                    gameEntities['boss'].x += (gameState.boss_tx - gameEntities['boss'].x) * 5 * dt; gameEntities['boss'].y += (gameState.boss_ty - gameEntities['boss'].y) * 5 * dt; bx = gameEntities['boss'].x; by = gameEntities['boss'].y;
                 } else { gameEntities['boss'] = {x: bx, y: by}; }
 
-                ctx.imageSmoothingEnabled = false; 
-                let bFrame = Math.floor(nowTime / 250) % 2; 
-                ctx.drawImage(texBoss[bFrame], bx, by, 120, 120); 
+                ctx.imageSmoothingEnabled = false; let bFrame = Math.floor(nowTime / 250) % 2; ctx.drawImage(texBoss[bFrame], bx, by, 120, 120); 
                 
-                if (localTimeLeft > 55) { 
-                    ctx.fillStyle = 'rgba(255,0,0,0.5)'; ctx.font = 'bold 60px "Press Start 2P"'; ctx.textAlign = 'center'; 
-                    ctx.fillText("ISHIN IST ERWACHT!", camera.x + canvas.width/2, camera.y + 200); 
-                }
-                
-                ctx.fillStyle = '#ff0000'; ctx.fillRect(bx, by - 20, 120, 12); 
-                ctx.fillStyle = '#00ffcc'; ctx.fillRect(bx, by - 20, 120 * (Math.max(0, gameState.boss_hp)/500), 12);
+                if (gameState.timeLeft > 55) { ctx.fillStyle = 'rgba(255,0,0,0.5)'; ctx.font = 'bold 60px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText("ISHIN IST ERWACHT!", camera.x + canvas.width/2, camera.y + 200); }
+                ctx.fillStyle = '#ff0000'; ctx.fillRect(bx, by - 20, 120, 12); ctx.fillStyle = '#00ffcc'; ctx.fillRect(bx, by - 20, 120 * (Math.max(0, gameState.boss_hp)/500), 12);
                 ctx.fillStyle = '#ffffff'; ctx.font = 'bold 16px "Outfit"'; ctx.textAlign = 'center'; ctx.fillText("ISHIN", bx + 60, by - 30);
             }
 
-            // Lasers
             if (gameState.last_laser && nowTime - gameState.last_laser.ts < 150) {
-                ctx.strokeStyle = 'rgba(255, 51, 102, 0.8)'; ctx.lineWidth = 6; ctx.beginPath(); 
-                ctx.moveTo(gameState.last_laser.x1, gameState.last_laser.y1); ctx.lineTo(gameState.last_laser.x2, gameState.last_laser.y2); ctx.stroke();
+                ctx.strokeStyle = 'rgba(255, 51, 102, 0.8)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(gameState.last_laser.x1, gameState.last_laser.y1); ctx.lineTo(gameState.last_laser.x2, gameState.last_laser.y2); ctx.stroke();
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); 
             }
 
-            // Basketball
             let drawBallX = localBall.x; let drawBallY = localBall.y; let drawBallZ = localBall.z;
             if (gameState.ball_owner) {
                 const owner = serverPlayers[gameState.ball_owner] || (gameState.ball_owner === currentUser.uid ? myLocalPlayer : null);
@@ -2127,7 +997,6 @@
                 ctx.fillStyle = '#ff6600'; ctx.beginPath(); ctx.arc(drawBallX, drawBallY - drawBallZ, 16, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
             }
 
-            // Particles
             for(let i=particles.length-1; i>=0; i--) {
                 let p = particles[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
                 if(p.isConfetti) p.vy += 600 * dt; 
@@ -2135,36 +1004,27 @@
                 ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 8, 8); ctx.globalAlpha = 1.0;
             }
 
-            // PLAYERS
             for(let id in serverPlayers) {
                 const sp = serverPlayers[id]; const isMe = (id === currentUser?.uid); const isGabri = (id === localCurrentGabri);
                 let px = isMe ? myLocalPlayer.x : (gameEntities[id]?.x || sp.x); let py = isMe ? myLocalPlayer.y : (gameEntities[id]?.y || sp.y);
 
                 if (!isMe && ((isInOG && py < 2000) || (!isInOG && py > 2000))) continue;
 
-                if (isGabri) { ctx.shadowColor = '#ff3366'; ctx.shadowBlur = 20 + Math.abs(Math.sin(nowTime * 0.005)) * 10; } 
+                if (isGabri && gameState.isPlaying) { ctx.shadowColor = '#ff3366'; ctx.shadowBlur = 20 + Math.abs(Math.sin(nowTime * 0.005)) * 10; } 
                 else { ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; }
 
                 ctx.imageSmoothingEnabled = false;
-                
                 let isMoving = isMe ? (Math.abs(Input.getVector().dx) > 0 || Math.abs(Input.getVector().dy) > 0) : (Math.hypot(sp.x - px, sp.y - py) > 5);
                 let frame = isMoving ? Math.floor(nowTime / 150) % 2 : 0;
-                
                 let stealth = isMe ? isStealthMode : sp.isStealth;
-                if (stealth) { 
-                    ctx.globalAlpha = 0.3; 
-                    ctx.drawImage(isGabri ? texGabri[frame] : texNormal[frame], px, py + 15, PLAYER_SIZE, PLAYER_SIZE - 15); 
-                } else { 
-                    ctx.drawImage(isGabri ? texGabri[frame] : texNormal[frame], px, py, PLAYER_SIZE, PLAYER_SIZE); 
-                }
+                
+                if (stealth) { ctx.globalAlpha = 0.3; ctx.drawImage(isGabri && gameState.isPlaying ? texGabri[frame] : texNormal[frame], px, py + 15, PLAYER_SIZE, PLAYER_SIZE - 15); } 
+                else { ctx.drawImage(isGabri && gameState.isPlaying ? texGabri[frame] : texNormal[frame], px, py, PLAYER_SIZE, PLAYER_SIZE); }
                 ctx.shadowBlur = 0; ctx.globalAlpha = 1.0;
 
                 let playerHeldItem = null;
                 if (isMe) playerHeldItem = myHeldItem;
-                else { 
-                    for(let i=1; i<=4; i++) if (gameState['sword'+i+'_owner'] === id) playerHeldItem = 'sword'; 
-                    if (gameState.mg_owner === id) playerHeldItem = 'mg'; 
-                }
+                else { for(let i=1; i<=4; i++) if (gameState['sword'+i+'_owner'] === id) playerHeldItem = 'sword'; if (gameState.mg_owner === id) playerHeldItem = 'mg'; }
                 
                 if (playerHeldItem && playerHeldItem.startsWith('sword')) {
                     let swingTs = isMe ? lastSwordAttack : sp.action_ts;
@@ -2173,40 +1033,30 @@
                         let prog = (nowTime - swingTs) / 200; let angle = isMe ? swordStartAngle : sp.action_angle;
                         ctx.save(); ctx.translate(px + 20, py + 20); ctx.rotate(angle + (prog * Math.PI)); 
                         ctx.fillStyle = '#aaaaaa'; ctx.fillRect(15, -3, 30, 6); ctx.fillStyle = '#ffcc00'; ctx.fillRect(10, -9, 6, 18); ctx.restore();
-                    } else { 
-                        ctx.fillStyle = '#aaaaaa'; ctx.fillRect(px + 35, py - 5, 6, 30); ctx.fillStyle = '#ffcc00'; ctx.fillRect(px + 31, py + 20, 14, 6); 
-                    }
+                    } else { ctx.fillStyle = '#aaaaaa'; ctx.fillRect(px + 35, py - 5, 6, 30); ctx.fillStyle = '#ffcc00'; ctx.fillRect(px + 31, py + 20, 14, 6); }
                 } else if (playerHeldItem === 'mg') { ctx.fillStyle = '#444'; ctx.fillRect(px + 10, py + 15, 30, 6); }
 
-                if (isGabri && nowTime < localGabriSince + TAG_COOLDOWN_MS) {
+                if (isGabri && gameState.isPlaying && nowTime < localGabriSince + TAG_COOLDOWN_MS) {
                     const progress = (nowTime - localGabriSince) / TAG_COOLDOWN_MS;
                     ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 3; ctx.beginPath();
                     ctx.arc(px + PLAYER_SIZE/2, py + PLAYER_SIZE/2, PLAYER_SIZE*0.8, -Math.PI/2, (-Math.PI/2) + (Math.PI*2*progress)); ctx.stroke();
                 }
 
                 if (!stealth) {
-                    ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white'); ctx.font = '600 14px "Outfit"'; ctx.textAlign = 'center';
+                    ctx.fillStyle = (isGabri && gameState.isPlaying) ? '#ff99aa' : (isMe ? '#00ffcc' : 'white'); ctx.font = '600 14px "Outfit"'; ctx.textAlign = 'center';
                     const textWidth = ctx.measureText(sp.name).width; ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(px + PLAYER_SIZE/2 - textWidth/2 - 4, py - 24, textWidth + 8, 18);
-                    ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white'); ctx.fillText(sp.name, px + PLAYER_SIZE/2, py - 10);
+                    ctx.fillStyle = (isGabri && gameState.isPlaying) ? '#ff99aa' : (isMe ? '#00ffcc' : 'white'); ctx.fillText(sp.name, px + PLAYER_SIZE/2, py - 10);
                 }
             }
 
-            // NIGHT MODE ANOMALY
-            if (localTimeLeft > 0 && localTimeLeft <= 30) {
-                let flickerAlpha = 0.96; 
-                if (Math.random() < 0.05) flickerAlpha = 0.8; 
-                if (localTimeLeft === 30 && (nowTime % 1000 < 500)) flickerAlpha = 0.4; 
-                
+            if (gameState.isPlaying && localTimeLeft > 0 && localTimeLeft <= 30) {
+                let flickerAlpha = 0.96; if (Math.random() < 0.05) flickerAlpha = 0.8; if (localTimeLeft === 30 && (nowTime % 1000 < 500)) flickerAlpha = 0.4; 
                 ctx.fillStyle = `rgba(2, 2, 5, ${flickerAlpha})`; ctx.fillRect(camera.x, camera.y, canvas.width, canvas.height);
                 ctx.globalCompositeOperation = 'destination-out';
-                
-                // My Flashlight
                 let myFlicker = 200 + Math.random() * 15;
                 let myRad = ctx.createRadialGradient(myLocalPlayer.x + 20, myLocalPlayer.y + 20, 10, myLocalPlayer.x + 20, myLocalPlayer.y + 20, myFlicker);
                 myRad.addColorStop(0, 'rgba(255,255,255,1)'); myRad.addColorStop(1, 'rgba(255,255,255,0)');
                 ctx.fillStyle = myRad; ctx.beginPath(); ctx.arc(myLocalPlayer.x + 20, myLocalPlayer.y + 20, myFlicker, 0, Math.PI*2); ctx.fill();
-
-                // Other Flashlights
                 for(let id in serverPlayers) {
                     if (id === currentUser?.uid) continue; 
                     const sp = serverPlayers[id]; let px = gameEntities[id]?.x || sp.x; let py = gameEntities[id]?.y || sp.y;
@@ -2218,15 +1068,11 @@
                     }
                 }
                 ctx.globalCompositeOperation = 'source-over';
-                
-                if (localTimeLeft === 30 || localTimeLeft === 29) { 
-                    ctx.fillStyle = 'rgba(255,0,0,0.8)'; ctx.font = 'bold 40px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText("STROMAUSFALL!", camera.x + canvas.width/2, camera.y + 150); 
-                }
+                if (localTimeLeft === 30 || localTimeLeft === 29) { ctx.fillStyle = 'rgba(255,0,0,0.8)'; ctx.font = 'bold 40px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText("STROMAUSFALL!", camera.x + canvas.width/2, camera.y + 150); }
             }
             
             ctx.restore(); 
 
-            // UI LAYER DRAWING
             ctx.save();
             ctx.beginPath(); ctx.arc(Input.joyBase.x, Input.joyBase.y, Input.joyBase.r, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
             ctx.beginPath(); ctx.arc(Input.joystick.nx, Input.joystick.ny, 25, 0, Math.PI*2); ctx.fillStyle = 'rgba(0, 255, 204, 0.4)'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 15; ctx.fill();
