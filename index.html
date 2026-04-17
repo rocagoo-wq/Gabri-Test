@@ -13,9 +13,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        /* ==========================================================================
-           CSS VARIABLES & RESET
-           ========================================================================== */
         :root {
             --primary: #00ffcc;
             --gabri: #ff3366;
@@ -43,9 +40,9 @@
             overscroll-behavior: none; 
         }
 
-        /* ==========================================================================
-           CRT EFFECT & CANVAS
-           ========================================================================== */
+        /* ------------------------------------------- */
+        /* CRT Scanline & Vignette Effect              */
+        /* ------------------------------------------- */
         .crt-overlay {
             position: fixed; 
             top: 0; 
@@ -70,9 +67,9 @@
             image-rendering: pixelated; 
         }
 
-        /* ==========================================================================
-           MODALS & SCREENS
-           ========================================================================== */
+        /* ------------------------------------------- */
+        /* MODALS & SCREENS                            */
+        /* ------------------------------------------- */
         .glass-panel {
             background: var(--glass-bg); 
             backdrop-filter: blur(20px); 
@@ -124,9 +121,9 @@
             line-height: 1.4; 
         }
 
-        /* ==========================================================================
-           INPUTS & BUTTONS
-           ========================================================================== */
+        /* ------------------------------------------- */
+        /* INPUTS & BUTTONS                            */
+        /* ------------------------------------------- */
         .input-io {
             width: 100%; 
             background: rgba(0,0,0,0.8); 
@@ -186,9 +183,9 @@
             box-shadow: none;
         }
 
-        /* ==========================================================================
-           GAME HUD
-           ========================================================================== */
+        /* ------------------------------------------- */
+        /* GAME HUD                                    */
+        /* ------------------------------------------- */
         #game-hud {
             position: absolute; 
             top: 0; 
@@ -305,10 +302,53 @@
             box-shadow: 0 0 20px rgba(0,255,204,0.4); 
             pointer-events: none;
         }
+
+        /* ------------------------------------------- */
+        /* Post-Game Leaderboard Screen                */
+        /* ------------------------------------------- */
+        #screen-leaderboard {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: none;
+            flex-direction: column; align-items: center; justify-content: center;
+            background: radial-gradient(circle at center, #1a1a24 0%, #050508 100%);
+            z-index: 60;
+        }
+
+        .leaderboard-container {
+            background: rgba(15, 15, 20, 0.95);
+            border: 2px solid rgba(255, 51, 102, 0.3);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 500px;
+        }
         
-        /* ------------------------------------------- */
-        /* Scrollbar Styling                           */
-        /* ------------------------------------------- */
+        .rank-row {
+            display: flex; 
+            justify-content: space-between; 
+            padding: 16px;
+            background: rgba(255,255,255,0.05); 
+            margin-bottom: 10px; 
+            border-radius: 10px;
+            font-weight: 600; 
+            color: white; 
+            font-size: 16px;
+        }
+        
+        .rank-loser { 
+            background: rgba(255, 51, 102, 0.2); 
+            border: 1px solid var(--gabri); 
+            color: #ff99aa;
+        }
+        
+        .rank-winner { 
+            background: rgba(0, 255, 204, 0.1); 
+            border: 1px solid var(--primary); 
+            color: var(--primary);
+        }
+        
         ::-webkit-scrollbar { width: 8px; } 
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; } 
         ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
@@ -317,7 +357,7 @@
 <body>
     <div class="crt-overlay"></div>
 
-    <!-- MAIN MENU (.IO STYLE) -->
+    <!-- 1. MAIN MENU (.IO STYLE) -->
     <div id="screens-layer">
         <div id="screen-main" class="screen glass-panel active">
             <h1>GABRI<span style="color:var(--primary)">.IO</span></h1>
@@ -329,10 +369,6 @@
                     <span>⚔️ SPACE (Aktion)</span>
                     <span>💨 SHIFT (Dash)</span>
                     <span>🗑️ C (Drop)</span>
-                </div>
-                <div class="text-xs text-gray-400 mt-2">
-                    Stehe still, um dich zu verstecken.<br>
-                    Nutze die Treppen, um Anomalien zu entkommen!
                 </div>
             </div>
 
@@ -354,20 +390,12 @@
 
             <button id="btnPlay" class="btn-play" disabled>BITTE WARTEN...</button>
         </div>
-
-        <!-- LEADERBOARD SCREEN -->
-        <div id="screen-leaderboard" class="screen glass-panel">
-            <h2 class="text-3xl font-bold text-center mb-2 text-white">RUNDE BEENDET</h2>
-            <p class="text-center text-red-400 text-sm mb-6 font-semibold">Wer am längsten Gabri war, verliert.</p>
-            <div id="leaderboardList" class="mb-6 max-h-[300px] overflow-y-auto bg-black p-4 rounded-lg border border-gray-800"></div>
-            <button id="btnRestart" class="btn-play" style="background: linear-gradient(135deg, #ff3366 0%, #cc0033 100%); color: white;">ZURÜCK ZUR LOBBY</button>
-        </div>
     </div>
 
-    <!-- GAME CANVAS -->
+    <!-- 2. GAME CANVAS -->
     <canvas id="gameCanvas"></canvas>
 
-    <!-- GAME HUD -->
+    <!-- 3. GAME HUD -->
     <div id="game-hud">
         <div class="hud-top">
             <div class="leaderboard-box">
@@ -383,7 +411,17 @@
                 <button id="btnStartRound" class="btn-start-round">RUNDE STARTEN</button>
             </div>
         </div>
-        <div id="floorDisplay">EG - ETAGE 0</div>
+        <div id="floorDisplay">EG - ERDGESCHOSS</div>
+    </div>
+
+    <!-- 4. LEADERBOARD SCREEN -->
+    <div id="screen-leaderboard">
+        <div class="leaderboard-container">
+            <h2 class="text-3xl font-bold text-center mb-2 text-white">RUNDE BEENDET</h2>
+            <p class="text-center text-red-400 text-sm mb-6 font-semibold">Wer am längsten Gabri war, verliert.</p>
+            <div id="leaderboardList" class="mb-6 max-h-[300px] overflow-y-auto bg-black p-4 rounded-lg border border-gray-800"></div>
+            <button id="btnRestart" class="btn-play" style="background: linear-gradient(135deg, #ff3366 0%, #cc0033 100%); color: white;">ZURÜCK ZUR LOBBY</button>
+        </div>
     </div>
 
     <!-- ============================================================================ -->
@@ -394,24 +432,19 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ============================================================================
+        // ----------------------------------------------------------------------
         // 1. FIREBASE CONFIGURATION (ENTERPRISE STANDARD)
-        // ============================================================================
-        const APP_ID = 'gabri-flucht-elite'; // BUGFIX: Hardcoded to ensure Database write permissions
-        let FIREBASE_CONFIG;
+        // ----------------------------------------------------------------------
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'gabri-flucht-elite';
         
-        try {
-            FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-                apiKey: "AIzaSyDWM2Dnq72MeWuZcV3uT4YXg0G9nyZIVAc", 
-                authDomain: "gabri-4f94c.firebaseapp.com",
-                projectId: "gabri-4f94c", 
-                storageBucket: "gabri-4f94c.firebasestorage.app",
-                messagingSenderId: "415746495575", 
-                appId: "1:415746495575:web:c9730e19c9ac3e6d923f12"
-            };
-        } catch(e) {
-            console.error("Config Parse Error", e);
-        }
+        const FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyDWM2Dnq72MeWuZcV3uT4YXg0G9nyZIVAc", 
+            authDomain: "gabri-4f94c.firebaseapp.com",
+            projectId: "gabri-4f94c", 
+            storageBucket: "gabri-4f94c.firebasestorage.app",
+            messagingSenderId: "415746495575", 
+            appId: "1:415746495575:web:c9730e19c9ac3e6d923f12"
+        };
         
         let fbApp, auth, db;
         try { 
@@ -422,9 +455,9 @@
             console.error("Firebase Init Error:", e); 
         }
 
-        // ============================================================================
+        // ----------------------------------------------------------------------
         // 2. AUDIO SYNTHESIS ENGINE (8-Bit Sound System)
-        // ============================================================================
+        // ----------------------------------------------------------------------
         class AudioSystem {
             constructor() {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -507,22 +540,13 @@
                     setTimeout(()=>this.playNoise(0.4, 0.4), i*100);
                 }
             }
-            sfxAnomaly() {
-                this.playTone(100, 'sawtooth', 1.0, 0.8, 50);
-            }
-            sfxLevelUp() {
-                this.playTone(400, 'sine', 0.1, 0.5);
-                setTimeout(()=>this.playTone(600, 'sine', 0.2, 0.5), 100);
-            }
-            sfxLevelDown() {
-                this.playTone(200, 'sawtooth', 0.3, 0.5, 100);
-            }
+            sfxAlert() { this.playTone(200, 'sawtooth', 0.5, 0.8, 100); }
         }
         const sfx = new AudioSystem();
 
-        // ============================================================================
+        // ----------------------------------------------------------------------
         // 3. GAME STATE & CONSTANTS
-        // ============================================================================
+        // ----------------------------------------------------------------------
         const GAME_DURATION_SEC = 180;
         const MAP_WIDTH = 3000, MAP_HEIGHT = 4000; 
         const PLAYER_SIZE = 40, BASE_SPEED = 350, TAG_COOLDOWN_MS = 2000;
@@ -578,88 +602,30 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // ============================================================================
-        // 4. ANOMALY SYSTEM (The "Exit 8" Concept)
-        // ============================================================================
-        class AnomalySystem {
-            constructor() {
-                this.floor = 0;
-                this.hasAnomaly = false;
-                this.anomalyType = 0; // 0=none, 1=Red Fog, 2=Reverse NPCs
-                this.generateFloor();
-            }
-
-            generateFloor() {
-                if (this.floor >= 8) {
-                    this.hasAnomaly = false;
-                    this.anomalyType = 0;
-                    return;
-                }
-                
-                // 40% chance of an anomaly
-                this.hasAnomaly = Math.random() < 0.4;
-                
-                if (this.hasAnomaly) {
-                    this.anomalyType = Math.floor(Math.random() * 2) + 1;
-                } else {
-                    this.anomalyType = 0;
-                }
-                
-                if (this.hasAnomaly) {
-                    sfx.sfxAnomaly(); // Creepy sound cue
+        // UI Manager
+        const UIManager = {
+            screens: document.getElementById('screens-layer'),
+            ui: document.getElementById('ui-layer'),
+            switchScreen: (id) => {
+                UIManager.screens.style.display = 'flex';
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById(id).classList.add('active');
+            },
+            hideScreens: () => { 
+                UIManager.screens.style.display = 'none'; 
+            },
+            setStatus: (msg, colorClass) => {
+                const el = document.getElementById('serverStatus');
+                if (el) {
+                    el.innerText = msg;
+                    el.className = "text-xs text-center mb-3 font-bold p-2 rounded border transition-all " + colorClass;
                 }
             }
+        };
 
-            processStair(isUp) {
-                // To proceed to the next floor:
-                // If anomaly -> go DOWN (!isUp)
-                // If normal -> go UP (isUp)
-                
-                let correctPath = false;
-                
-                if (this.hasAnomaly) {
-                    if (!isUp) correctPath = true;
-                } else {
-                    if (isUp) correctPath = true;
-                }
-
-                if (correctPath) {
-                    this.floor++;
-                    sfx.sfxLevelUp();
-                } else {
-                    this.floor = 0;
-                    sfx.sfxLevelDown();
-                }
-
-                if (this.floor === 8) {
-                    // Reward!
-                    myHeldItem = 'mg';
-                    sfx.sfxScore();
-                    Physics.spawnConfetti(myLocalPlayer.x, myLocalPlayer.y);
-                }
-
-                this.generateFloor();
-                this.updateUI();
-            }
-
-            updateUI() {
-                const fd = document.getElementById('floorDisplay');
-                if (this.floor >= 8) {
-                    fd.innerText = `ETAGE MAX - DU BIST FREI`;
-                    fd.style.color = '#ffcc00';
-                    fd.style.borderColor = '#ffcc00';
-                } else {
-                    fd.innerText = `ETAGE ${this.floor}`;
-                    fd.style.color = 'var(--primary)';
-                    fd.style.borderColor = 'var(--primary)';
-                }
-            }
-        }
-        const anomalySys = new AnomalySystem();
-
-        // ============================================================================
-        // 5. MAP GENERATION (Procedural Rooms, Stairs, NPCs)
-        // ============================================================================
+        // ----------------------------------------------------------------------
+        // 4. MAP GENERATION (Procedural Rooms, Stairs, NPCs)
+        // ----------------------------------------------------------------------
         let obstacles = [], labels = [], stairs = [], npcs = [], spawnDrinks = [];
         const hoop = { x: 2200, y: 1220, w: 100, h: 20 };
         
@@ -697,11 +663,11 @@
                 this.buildRoom(100, 3200, 1000, 700, 'top', 400, 200, 'LEHRERZIMMER (OG)');
                 this.buildRoom(1500, 3200, 1400, 700, 'top', 500, 200, 'BIBLIOTHEK (OG)');
                 
-                // Treppen (isUp gibt an, ob die Treppe nach oben führt)
-                stairs.push({ x: 1225, y: 400, w: 150, h: 150, targetY: 2400, label: 'ZUM OG', isUp: true });
-                stairs.push({ x: 1225, y: 2400, w: 150, h: 150, targetY: 400, label: 'ZUM EG', isUp: false });
-                stairs.push({ x: 1225, y: 1500, w: 150, h: 150, targetY: 3500, label: 'ZUM OG', isUp: true });
-                stairs.push({ x: 1225, y: 3500, w: 150, h: 150, targetY: 1500, label: 'ZUM EG', isUp: false });
+                // Treppen 
+                stairs.push({ x: 1225, y: 400, w: 150, h: 150, targetY: 2400, label: 'ZUM OG' });
+                stairs.push({ x: 1225, y: 2400, w: 150, h: 150, targetY: 400, label: 'ZUM EG' });
+                stairs.push({ x: 1225, y: 1500, w: 150, h: 150, targetY: 3500, label: 'ZUM OG' });
+                stairs.push({ x: 1225, y: 3500, w: 150, h: 150, targetY: 1500, label: 'ZUM EG' });
 
                 this.spawnNPCs();
             }
@@ -832,7 +798,7 @@
         MapGenerator.init();
 
         // ----------------------------------------------------------------------
-        // 6. GRAPHICS & SPRITES GENERATOR
+        // 5. GRAPHICS & SPRITES GENERATOR
         // ----------------------------------------------------------------------
         function createPixelSprite(type, frame=0) {
             const sc = document.createElement('canvas'); 
@@ -902,7 +868,7 @@
         const texZombie = [createPixelSprite('zombie', 0), createPixelSprite('zombie', 1)];
 
         // ----------------------------------------------------------------------
-        // 7. INPUT CONTROLLER (Touch & Keyboard)
+        // 6. INPUT CONTROLLER (Touch & Keyboard)
         // ----------------------------------------------------------------------
         const Input = {
             joyBase: { x: 120, y: window.innerHeight - 120, r: 70 },
@@ -1050,7 +1016,7 @@
         Input.init();
 
         // ----------------------------------------------------------------------
-        // 8. PHYSICS & ACTIONS MODULE
+        // 7. PHYSICS & ACTIONS MODULE
         // ----------------------------------------------------------------------
         const Physics = {
             checkWall(nx, ny) {
@@ -1375,7 +1341,7 @@
         };
 
         // ============================================================================
-        // 9. LOGIN & NETWORK LOGIC (.IO STYLE)
+        // 8. LOGIN & NETWORK LOGIC (.IO STYLE)
         // ============================================================================
         let isAuthReady = false;
 
@@ -1505,7 +1471,7 @@
         });
 
         // ----------------------------------------------------------------------
-        // 10. FIREBASE SYNC LISTENERS
+        // 9. FIREBASE SYNC LISTENERS
         // ----------------------------------------------------------------------
         let playersUnsubscribe = null;
         let roomUnsubscribe = null;
@@ -1553,17 +1519,6 @@
                     lbContent += `<div class="lb-row"><span style="color:${id===currentUser.uid?'#00ffcc':'white'}">${p.name}</span><span>${(t/1000).toFixed(1)}s</span></div>`;
                 }
                 document.getElementById('lb-content').innerHTML = lbContent;
-                
-                // Allow anyone to start the game
-                let activeCount = activeIds.length;
-                const btnStart = document.getElementById('btnStartRound');
-                if (gameState.isPlaying) {
-                    btnStart.style.display = 'none';
-                } else {
-                    btnStart.style.display = 'block';
-                    btnStart.innerText = `RUNDE STARTEN (${activeCount} SPIELER)`;
-                    btnStart.disabled = false;
-                }
             });
 
             // 2. SYNC ROOM / GAME STATE
@@ -1655,6 +1610,11 @@
                     
                 } else { 
                     gameState.isPlaying = false; 
+                    
+                    // IF GAME IS NOT PLAYING, SHOW START BUTTON
+                    document.getElementById('btnStartRound').style.display = 'block';
+                    document.getElementById('gameRole').innerText = "Erkunde die Map";
+                    document.getElementById('hudStatusBox').classList.remove('is-gabri-alert');
                 }
                 
                 checkGameOverState();
@@ -1758,7 +1718,7 @@
         }
 
         // ============================================================================
-        // 11. GAME LOOP 
+        // 10. GAME LOOP 
         // ============================================================================
         function gameLoop(timestamp) {
             if (!isGameRunning) return;
@@ -1823,173 +1783,176 @@
                 }
 
                 // GAMEPLAY TASKS (Runs during Warmup AND Game!)
-                const move = Input.getVector();
-                if (dashSpeedMult > 1.0) { dashSpeedMult -= dt * 6; if (dashSpeedMult < 1.0) dashSpeedMult = 1.0; }
-                if (now > energyDrinkEndTime) activeSpeedMult = 1.0;
+                if (document.getElementById('screens-layer').style.display === 'none') {
+                    const move = Input.getVector();
+                    if (dashSpeedMult > 1.0) { dashSpeedMult -= dt * 6; if (dashSpeedMult < 1.0) dashSpeedMult = 1.0; }
+                    if (now > energyDrinkEndTime) activeSpeedMult = 1.0;
 
-                let mx = (move.dx * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vx) * dt;
-                let my = (move.dy * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vy) * dt;
-                kb_vx *= 0.85; kb_vy *= 0.85; 
+                    let mx = (move.dx * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vx) * dt;
+                    let my = (move.dy * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vy) * dt;
+                    kb_vx *= 0.85; kb_vy *= 0.85; 
 
-                // Stealth Mode
-                if (Math.abs(move.dx) < 0.1 && Math.abs(move.dy) < 0.1 && Math.abs(kb_vx) < 10 && Math.abs(kb_vy) < 10) {
-                    timeStandingStill += dt;
-                } else {
-                    timeStandingStill = 0; 
-                    const len = Math.hypot(move.dx, move.dy); 
-                    if (len > 0) myFacing = { x: move.dx/len, y: move.dy/len };
-                }
-                
-                let newStealth = timeStandingStill > 2.0;
-                if (newStealth !== isStealthMode) { 
-                    isStealthMode = newStealth; 
-                    updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { isStealth: isStealthMode }).catch(()=>{}); 
-                }
-
-                // ANTI STUCK COLLISION SYSTEM
-                let steps = 5; 
-                let stepX = mx / steps; 
-                let stepY = my / steps;
-                
-                for(let i=0; i<steps; i++) {
-                    if (!Physics.checkWall(myLocalPlayer.x + stepX, myLocalPlayer.y)) {
-                        myLocalPlayer.x += stepX; 
-                    } else { kb_vx = 0; }
+                    // Stealth Mode
+                    if (Math.abs(move.dx) < 0.1 && Math.abs(move.dy) < 0.1 && Math.abs(kb_vx) < 10 && Math.abs(kb_vy) < 10) {
+                        timeStandingStill += dt;
+                    } else {
+                        timeStandingStill = 0; 
+                        const len = Math.hypot(move.dx, move.dy); 
+                        if (len > 0) myFacing = { x: move.dx/len, y: move.dy/len };
+                    }
                     
-                    if (!Physics.checkWall(myLocalPlayer.x, myLocalPlayer.y + stepY)) {
-                        myLocalPlayer.y += stepY; 
-                    } else { kb_vy = 0; }
-                }
-                
-                // Check Stairs & Anomaly ("Exit 8")
-                if (now - lastStairTime >= 1000) {
-                    for (let s of stairs) {
-                        if (myLocalPlayer.x < s.x + s.w && myLocalPlayer.x + PLAYER_SIZE > s.x && myLocalPlayer.y < s.y + s.h && myLocalPlayer.y + PLAYER_SIZE > s.y) {
-                            myLocalPlayer.y = s.targetY; 
-                            lastStairTime = now; 
-                            Physics.spawnParticles(myLocalPlayer.x, myLocalPlayer.y, '#00ffcc'); 
-                            sfx.sfxDash(); 
-                            anomalySys.processStair(s.isUp);
-                            break;
-                        }
+                    let newStealth = timeStandingStill > 2.0;
+                    if (newStealth !== isStealthMode) { 
+                        isStealthMode = newStealth; 
+                        updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { isStealth: isStealthMode }).catch(()=>{}); 
                     }
-                }
 
-                // Boss Knockback (Fix: Away from boss)
-                if (gameState.boss_active && gameState.boss_hp > 0 && myLocalPlayer.y > 2000) {
-                    if (Math.hypot(myLocalPlayer.x - gameState.boss_x, myLocalPlayer.y - gameState.boss_y) < 100 && !isStealthMode) {
-                        const angleFromBoss = Math.atan2(myLocalPlayer.y - gameState.boss_y, myLocalPlayer.x - gameState.boss_x);
-                        kb_vx = Math.cos(angleFromBoss) * 3000; 
-                        kb_vy = Math.sin(angleFromBoss) * 3000; 
-                        Physics.spawnParticles(myLocalPlayer.x + 20, myLocalPlayer.y + 20, '#ff0000'); 
-                        sfx.playNoise(0.3, 1.0);
-                    }
-                }
-
-                // LOCAL BALL PHYSICS
-                if (!gameState.ball_owner && localBall.active) {
-                    let bnx = localBall.x + localBall.vx * dt; 
-                    let bny = localBall.y + localBall.vy * dt;
-                    let hitX = Physics.checkWall(bnx, localBall.y); 
-                    let hitY = Physics.checkWall(localBall.x, bny);
+                    // ANTI STUCK COLLISION SYSTEM
+                    let steps = 5; 
+                    let stepX = mx / steps; 
+                    let stepY = my / steps;
                     
-                    if (hitX) { localBall.vx *= -0.7; sfx.sfxBounce(); } else localBall.x = bnx;
-                    if (hitY) { localBall.vy *= -0.7; sfx.sfxBounce(); } else localBall.y = bny;
-                    
-                    localBall.vx *= 0.98; localBall.vy *= 0.98; 
-                    localBall.vz -= 800 * dt; 
-                    localBall.z += localBall.vz * dt;
-                    
-                        if (localBall.z < 0) {
-                        localBall.z = 0; 
-                        if (localBall.vz < -50) { 
-                            localBall.vz *= -0.6; 
-                            sfx.sfxBounce(); 
-                        } else { 
-                            localBall.vz = 0; localBall.vx *= 0.9; localBall.vy *= 0.9; 
-                        }
-                    }
-
-                    if (localBall.z > 80 && Math.hypot(localBall.x - (hoop.x + hoop.w/2), localBall.y - (hoop.y + 10)) < 40) {
-                        if (now - lastConfettiTs > 1000) {
-                            Physics.spawnConfetti(hoop.x + hoop.w/2, hoop.y + 10); 
-                            lastConfettiTs = now; 
-                            lastScoreTs = now; 
-                            updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { lastScoreTs: now }).catch(()=>{}); 
-                        }
-                    }
-                }
-
-                // CAMERA LERP
-                const targetCamX = myLocalPlayer.x + PLAYER_SIZE/2 - canvas.width/2; 
-                const targetCamY = myLocalPlayer.y + PLAYER_SIZE/2 - canvas.height/2;
-                camera.x += (targetCamX - camera.x) * 10 * dt;
-                if (Math.abs(targetCamY - camera.y) > 1000) camera.y = targetCamY; 
-                else camera.y += (targetCamY - camera.y) * 10 * dt;
-                
-                camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width)); 
-                camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
-
-                // ENTITY INTERPOLATION
-                for(let id in serverPlayers) {
-                    if (id !== currentUser.uid && gameEntities[id]) {
-                        if (Math.abs(serverPlayers[id].y - gameEntities[id].y) > 1000) {
-                            gameEntities[id].y = serverPlayers[id].y;
-                        } else {
-                            gameEntities[id].y += (serverPlayers[id].y - gameEntities[id].y) * 15 * dt;
-                        }
-                        gameEntities[id].x += (serverPlayers[id].x - gameEntities[id].x) * 15 * dt;
-                    }
-                }
-
-                // SYNC POS
-                if (now - lastSyncTime > 100) { 
-                    lastSyncTime = now;
-                    updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { 
-                        x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y)
-                    }).catch(()=>{});
-                }
-
-                // TAG CHECK
-                if (gameState.isPlaying && localCurrentGabri === currentUser.uid && now >= localGabriSince + TAG_COOLDOWN_MS) {
-                    for (let id in serverPlayers) {
-                        if (id === currentUser.uid) continue;
-                        const p = gameEntities[id] || serverPlayers[id]; 
-                        if (serverPlayers[id].isStealth) continue; 
+                    for(let i=0; i<steps; i++) {
+                        if (!Physics.checkWall(myLocalPlayer.x + stepX, myLocalPlayer.y)) {
+                            myLocalPlayer.x += stepX; 
+                        } else { kb_vx = 0; }
                         
-                        if (Math.hypot((p.x+PLAYER_SIZE/2) - (myLocalPlayer.x+PLAYER_SIZE/2), (p.y+PLAYER_SIZE/2) - (myLocalPlayer.y+PLAYER_SIZE/2)) < PLAYER_SIZE * 0.9) { 
-                            Physics.spawnParticles(p.x, p.y, '#ff3366'); 
-                            try {
-                                Promise.all([
-                                    updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { timeAsGabri: increment(now - localGabriSince) }),
-                                    updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { currentGabri: id, tagCounter: increment(1) })
-                                ]);
-                            } catch(e) {}
-                            break;
+                        if (!Physics.checkWall(myLocalPlayer.x, myLocalPlayer.y + stepY)) {
+                            myLocalPlayer.y += stepY; 
+                        } else { kb_vy = 0; }
+                    }
+                    
+                    // Check Stairs
+                    if (now - lastStairTime >= 1000) {
+                        for (let s of stairs) {
+                            if (myLocalPlayer.x < s.x + s.w && myLocalPlayer.x + PLAYER_SIZE > s.x && myLocalPlayer.y < s.y + s.h && myLocalPlayer.y + PLAYER_SIZE > s.y) {
+                                myLocalPlayer.y = s.targetY; 
+                                lastStairTime = now; 
+                                Physics.spawnParticles(myLocalPlayer.x, myLocalPlayer.y, '#00ffcc'); 
+                                sfx.sfxDash(); 
+                                break;
+                            }
                         }
                     }
-                }
 
-                // UPDATE HUD
-                if (gameState.isPlaying) {
-                    const min = Math.floor(localTimeLeft / 60); 
-                    const sec = localTimeLeft % 60;
-                    document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
-                } else {
-                    document.getElementById('timerDisplay').innerText = "WARMUP";
+                    // Boss Knockback (Fix: Away from boss)
+                    if (gameState.boss_active && gameState.boss_hp > 0 && myLocalPlayer.y > 2000) {
+                        if (Math.hypot(myLocalPlayer.x - gameState.boss_x, myLocalPlayer.y - gameState.boss_y) < 100 && !isStealthMode) {
+                            const angleFromBoss = Math.atan2(myLocalPlayer.y - gameState.boss_y, myLocalPlayer.x - gameState.boss_x);
+                            kb_vx = Math.cos(angleFromBoss) * 3000; 
+                            kb_vy = Math.sin(angleFromBoss) * 3000; 
+                            Physics.spawnParticles(myLocalPlayer.x + 20, myLocalPlayer.y + 20, '#ff0000'); 
+                            sfx.playNoise(0.3, 1.0);
+                        }
+                    }
+
+                    // LOCAL BALL PHYSICS
+                    if (!gameState.ball_owner && localBall.active) {
+                        let bnx = localBall.x + localBall.vx * dt; 
+                        let bny = localBall.y + localBall.vy * dt;
+                        let hitX = Physics.checkWall(bnx, localBall.y); 
+                        let hitY = Physics.checkWall(localBall.x, bny);
+                        
+                        if (hitX) { localBall.vx *= -0.7; sfx.sfxBounce(); } else localBall.x = bnx;
+                        if (hitY) { localBall.vy *= -0.7; sfx.sfxBounce(); } else localBall.y = bny;
+                        
+                        localBall.vx *= 0.98; localBall.vy *= 0.98; 
+                        localBall.vz -= 800 * dt; 
+                        localBall.z += localBall.vz * dt;
+                        
+                        if (localBall.z < 0) {
+                            localBall.z = 0; 
+                            if (localBall.vz < -50) { 
+                                localBall.vz *= -0.6; 
+                                sfx.sfxBounce(); 
+                            } else { 
+                                localBall.vz = 0; localBall.vx *= 0.9; localBall.vy *= 0.9; 
+                            }
+                        }
+
+                        if (localBall.z > 80 && Math.hypot(localBall.x - (hoop.x + hoop.w/2), localBall.y - (hoop.y + 10)) < 40) {
+                            if (now - lastConfettiTs > 1000) {
+                                Physics.spawnConfetti(hoop.x + hoop.w/2, hoop.y + 10); 
+                                lastConfettiTs = now; 
+                                lastScoreTs = now; 
+                                updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { lastScoreTs: now }).catch(()=>{}); 
+                            }
+                        }
+                    }
+
+                    // CAMERA LERP
+                    const targetCamX = myLocalPlayer.x + PLAYER_SIZE/2 - canvas.width/2; 
+                    const targetCamY = myLocalPlayer.y + PLAYER_SIZE/2 - canvas.height/2;
+                    camera.x += (targetCamX - camera.x) * 10 * dt;
+                    if (Math.abs(targetCamY - camera.y) > 1000) camera.y = targetCamY; 
+                    else camera.y += (targetCamY - camera.y) * 10 * dt;
+                    
+                    camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width)); 
+                    camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
+
+                    // ENTITY INTERPOLATION
+                    for(let id in serverPlayers) {
+                        if (id !== currentUser.uid && gameEntities[id]) {
+                            if (Math.abs(serverPlayers[id].y - gameEntities[id].y) > 1000) {
+                                gameEntities[id].y = serverPlayers[id].y;
+                            } else {
+                                gameEntities[id].y += (serverPlayers[id].y - gameEntities[id].y) * 15 * dt;
+                            }
+                            gameEntities[id].x += (serverPlayers[id].x - gameEntities[id].x) * 15 * dt;
+                        }
+                    }
+
+                    // SYNC POS
+                    if (now - lastSyncTime > 100) { 
+                        lastSyncTime = now;
+                        updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { 
+                            x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y)
+                        }).catch(()=>{});
+                    }
+
+                    // TAG CHECK (Only if playing)
+                    if (gameState.isPlaying && localCurrentGabri === currentUser.uid && now >= localGabriSince + TAG_COOLDOWN_MS) {
+                        for (let id in serverPlayers) {
+                            if (id === currentUser.uid) continue;
+                            const p = gameEntities[id] || serverPlayers[id]; 
+                            if (serverPlayers[id].isStealth) continue; 
+                            
+                            if (Math.hypot((p.x+PLAYER_SIZE/2) - (myLocalPlayer.x+PLAYER_SIZE/2), (p.y+PLAYER_SIZE/2) - (myLocalPlayer.y+PLAYER_SIZE/2)) < PLAYER_SIZE * 0.9) { 
+                                Physics.spawnParticles(p.x, p.y, '#ff3366'); 
+                                try {
+                                    Promise.all([
+                                        updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { timeAsGabri: increment(now - localGabriSince) }),
+                                        updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoom), { currentGabri: id, tagCounter: increment(1) })
+                                    ]);
+                                } catch(e) {}
+                                break;
+                            }
+                        }
+                    }
+
+                    // UPDATE HUD TEXTS
+                    if (gameState.isPlaying) {
+                        const min = Math.floor(localTimeLeft / 60); 
+                        const sec = localTimeLeft % 60;
+                        document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+                    } else {
+                        document.getElementById('timerDisplay').innerText = "WARMUP";
+                    }
+                    
+                    let myTotal = serverPlayers[currentUser.uid]?.timeAsGabri || 0; 
+                    if (gameState.isPlaying && localCurrentGabri === currentUser.uid) myTotal += (now - localGabriSince);
+                    document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(myTotal/1000).toFixed(1)}s`;
+                    
+                    document.getElementById('floorDisplay').innerText = myLocalPlayer.y > 2000 ? "OBERGESCHOSS (OG)" : "ERDGESCHOSS (EG)";
+                
+                    drawFrame(dt, now);
                 }
-                
-                let myTotal = serverPlayers[currentUser.uid]?.timeAsGabri || 0; 
-                if (gameState.isPlaying && localCurrentGabri === currentUser.uid) myTotal += (now - localGabriSince);
-                document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(myTotal/1000).toFixed(1)}s`;
-                
-                drawFrame(dt, now);
             }
-            if(isGameRunning) requestAnimationFrame(gameLoop);
+            requestAnimationFrame(gameLoop);
         }
 
         // ============================================================================
-        // 12. RENDERER
+        // 11. RENDERER
         // ============================================================================
         function drawFrame(dt, nowTime) {
             // Update NPC Physics
@@ -2020,12 +1983,6 @@
             const isInOG = camera.y > 1500;
             ctx.fillStyle = isInOG ? '#0b111a' : '#0d0d12'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // ANOMALY 1: Red Floor Tint
-            if (anomalySys.hasAnomaly && anomalySys.anomalyType === 1) {
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.05)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
 
             ctx.save(); 
             ctx.translate(-camera.x, -camera.y);
@@ -2122,17 +2079,7 @@
 
             for(let l of labels) {
                 if (l.x < camera.x - 200 || l.x > camera.x + canvas.width + 200 || l.y < camera.y - 200 || l.y > camera.y + canvas.height + 200) continue;
-                ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.font = 'bold 36px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; 
-                // ANOMALY 2: Reversed Text
-                if (anomalySys.hasAnomaly && anomalySys.anomalyType === 2) {
-                    ctx.save();
-                    ctx.translate(l.x, l.y);
-                    ctx.scale(-1, 1);
-                    ctx.fillText(l.text, 0, 0);
-                    ctx.restore();
-                } else {
-                    ctx.fillText(l.text, l.x, l.y);
-                }
+                ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.font = 'bold 36px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(l.text, l.x, l.y);
             }
 
             // NPCs
