@@ -483,7 +483,8 @@
         // ----------------------------------------------------------------------
         // 1. FIREBASE CONFIGURATION (ENTERPRISE STANDARD)
         // ----------------------------------------------------------------------
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'gabri-2026-core';
+        // BUGFIX: Nutze durchgehend "appId" im JavaScript, um ReferenceErrors zu vermeiden
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-2026-core';
         const FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyDWM2Dnq72MeWuZcV3uT4YXg0G9nyZIVAc", 
             authDomain: "gabri-4f94c.firebaseapp.com",
@@ -589,7 +590,7 @@
             hostId: null, 
             roundId: null, 
             tagCounter: 0, 
-            timeLeft: 0, // NEW: Sync time left from Host to avoid serverTimestamp issues
+            timeLeft: 0, 
             
             ball_x: 2200, ball_y: 1500, ball_vx: 0, ball_vy: 0, ball_owner: null, ball_ts: 0, lastScoreTs: 0,
             
@@ -1345,41 +1346,55 @@
         // ============================================================================
         document.getElementById('btnJoin').addEventListener('click', async () => {
             const name = document.getElementById('playerNameInput').value.trim();
-            if (!name) return; 
+            if (!name) {
+                alert("Bitte gib einen Namen ein!");
+                return; 
+            }
             myName = name.substring(0, 12);
             
             document.getElementById('btnJoin').innerText = "VERBINDE..."; 
             document.getElementById('btnJoin').disabled = true; 
             
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
+                // FIXED AUTH FLOW: Check if user is already logged in before calling signIn
+                if (auth.currentUser) {
+                    currentUser = auth.currentUser;
                 } else {
-                    await signInAnonymously(auth);
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        const cred = await signInWithCustomToken(auth, __initial_auth_token);
+                        currentUser = cred.user;
+                    } else {
+                        const cred = await signInAnonymously(auth);
+                        currentUser = cred.user;
+                    }
                 }
-                currentUser = auth.currentUser;
                 
                 if (currentUser) {
                     sfx.enable(); 
                     UIManager.switchScreen('screen-room');
                     
                     // LOBBY COUNTER
-                    onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'players'), (snapshot) => {
-                        const counts = {"GABRI RAUM": 0, "RAUM DES GABRIS": 0, "GABRILOGIE": 0, "GABRIELS": 0};
-                        const now = Date.now();
-                        snapshot.forEach(doc => { 
-                            const data = doc.data(); 
-                            if (data.roomId && counts[data.roomId] !== undefined && (now - data.lastSeen) < 20000) {
-                                counts[data.roomId]++; 
-                            }
+                    if (!globalRoomUnsubscribe) {
+                        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'players'), (snapshot) => {
+                            const counts = {"GABRI RAUM": 0, "RAUM DES GABRIS": 0, "GABRILOGIE": 0, "GABRIELS": 0};
+                            const now = Date.now();
+                            snapshot.forEach(doc => { 
+                                const data = doc.data(); 
+                                if (data.roomId && counts[data.roomId] !== undefined && (now - data.lastSeen) < 20000) {
+                                    counts[data.roomId]++; 
+                                }
+                            });
+                            document.querySelectorAll('.room-btn').forEach(btn => { 
+                                const rName = btn.getAttribute('data-room'); 
+                                document.getElementById(`count-${rName}`).innerText = `${counts[rName]}/10`; 
+                            });
                         });
-                        document.querySelectorAll('.room-btn').forEach(btn => { 
-                            const rName = btn.getAttribute('data-room'); 
-                            document.getElementById(`count-${rName}`).innerText = `${counts[rName]}/10`; 
-                        });
-                    });
+                    }
+                } else {
+                    throw new Error("Authentifizierung fehlgeschlagen.");
                 }
             } catch (e) { 
+                console.error(e);
                 alert("Verbindungsfehler: " + e.message); 
                 document.getElementById('btnJoin').innerText = "SYSTEM STARTEN"; 
                 document.getElementById('btnJoin').disabled = false; 
@@ -1425,6 +1440,7 @@
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
 
             // SYNC PLAYERS
+            if (playersUnsubscribe) playersUnsubscribe();
             playersUnsubscribe = onSnapshot(playersRef, (snapshot) => {
                 const localNow = performance.now();
                 snapshot.docChanges().forEach(change => {
@@ -1451,6 +1467,7 @@
             });
 
             // SYNC ROOM / GAME STATE
+            if (roomUnsubscribe) roomUnsubscribe();
             roomUnsubscribe = onSnapshot(roomRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const newState = docSnap.data();
