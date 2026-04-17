@@ -405,7 +405,7 @@
         <!-- 1. LOGIN SCREEN -->
         <div id="screen-login" class="screen glass-panel active">
             <h1>GABRI<br><span style="color:white; font-size: 14px; letter-spacing: 4px;">FLUCHT</span></h1>
-            <p class="text-gray-300 text-center mb-6 text-sm font-semibold leading-relaxed">
+            <p class="text-gray-300 text-center mb-4 text-sm font-semibold leading-relaxed">
                 Willkommen zur 2026 Elite Edition.<br>
                 <span class="text-xs text-primary font-normal mt-2 block bg-gray-900 p-3 rounded-lg border border-gray-700">
                     A/Space = Aktion / Schlagen<br>
@@ -413,8 +413,14 @@
                     C/Y = Item Fallenlassen
                 </span>
             </p>
+            
+            <!-- NEU: Server Status UI -->
+            <div id="serverStatus" class="text-xs text-yellow-400 text-center mb-3 font-bold bg-black p-2 rounded border border-yellow-900">
+                📡 Verbinde zum Spielserver...
+            </div>
+
             <input type="text" id="playerNameInput" class="input-elite" placeholder="DEIN NAME" maxlength="12" autocomplete="off">
-            <button id="btnJoin" class="btn-elite">SYSTEM STARTEN</button>
+            <button id="btnJoin" class="btn-elite" disabled>SYSTEM STARTEN</button>
         </div>
 
         <!-- 2. SERVER BROWSER -->
@@ -445,7 +451,7 @@
                     Verbunden
                 </div>
             </div>
-            <p class="text-center text-gray-400 text-sm mb-4 bg-gray-900 p-2 rounded">
+            <p class="text-center text-gray-400 text-sm mb-4 bg-gray-900 p-2 rounded border border-gray-700">
                 Stehe 2 Sek still, um dich zu verstecken.<br>Lass Items mit 'C' fallen.
             </p>
             <div class="player-list p-2" id="lobbyPlayerList"></div>
@@ -457,7 +463,7 @@
             
             <!-- Client Controls -->
             <div id="clientControls">
-                <button class="btn-elite" disabled style="background: #333; color: #888;">
+                <button class="btn-elite" disabled style="background: #333; color: #888; border-color: #555;">
                     WARTE AUF HOST...
                 </button>
             </div>
@@ -483,7 +489,6 @@
         // ----------------------------------------------------------------------
         // 1. FIREBASE CONFIGURATION (ENTERPRISE STANDARD)
         // ----------------------------------------------------------------------
-        // BUGFIX: Nutze durchgehend "appId" im JavaScript, um ReferenceErrors zu vermeiden
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-2026-core';
         const FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyDWM2Dnq72MeWuZcV3uT4YXg0G9nyZIVAc", 
@@ -622,6 +627,7 @@
         let isStealthMode = false, timeStandingStill = 0;
         let kb_vx = 0, kb_vy = 0, lastKnockbackTs = 0;
         
+        let isGameLoopRunning = false;
         let lastUpdateTime = performance.now(), lastSyncTime = 0;
         let lastHeartbeatTs = 0;
         let particles = [];
@@ -1344,60 +1350,82 @@
         // ============================================================================
         // 8. NETWORK CONTROLLER (AUTH, LOBBY, SYNC)
         // ============================================================================
-        document.getElementById('btnJoin').addEventListener('click', async () => {
+        let isAuthReady = false;
+
+        // Auto-Initialize Auth in background to avoid click-stuck bugs
+        async function performAutoAuth() {
+            try {
+                if (!auth.currentUser) {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                }
+                
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUser = user;
+                        isAuthReady = true;
+                        
+                        const statusEl = document.getElementById('serverStatus');
+                        if(statusEl) {
+                            statusEl.innerText = "SERVER ONLINE 🟢";
+                            statusEl.className = "text-xs text-green-400 text-center mb-3 font-bold bg-black p-2 rounded border border-green-900";
+                        }
+                        
+                        const btn = document.getElementById('btnJoin');
+                        if (btn) {
+                            btn.innerText = "SYSTEM STARTEN";
+                            btn.disabled = false;
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error("Auth Init Failed:", e);
+                const statusEl = document.getElementById('serverStatus');
+                if(statusEl) {
+                    statusEl.innerText = "SERVER OFFLINE 🔴";
+                    statusEl.className = "text-xs text-red-400 text-center mb-3 font-bold bg-black p-2 rounded border border-red-900";
+                }
+                alert("Verbindungsfehler zur Spieldatenbank. Überprüfe die Firebase Konfiguration.");
+            }
+        }
+        
+        // Execute immediately
+        performAutoAuth();
+
+        document.getElementById('btnJoin').addEventListener('click', () => {
             const name = document.getElementById('playerNameInput').value.trim();
             if (!name) {
                 alert("Bitte gib einen Namen ein!");
                 return; 
             }
+            if (!isAuthReady || !currentUser) {
+                alert("Warte auf Serververbindung...");
+                return;
+            }
+            
             myName = name.substring(0, 12);
+            sfx.enable(); 
+            UIManager.switchScreen('screen-room');
             
-            document.getElementById('btnJoin').innerText = "VERBINDE..."; 
-            document.getElementById('btnJoin').disabled = true; 
-            
-            try {
-                // FIXED AUTH FLOW: Check if user is already logged in before calling signIn
-                if (auth.currentUser) {
-                    currentUser = auth.currentUser;
-                } else {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        const cred = await signInWithCustomToken(auth, __initial_auth_token);
-                        currentUser = cred.user;
-                    } else {
-                        const cred = await signInAnonymously(auth);
-                        currentUser = cred.user;
-                    }
-                }
-                
-                if (currentUser) {
-                    sfx.enable(); 
-                    UIManager.switchScreen('screen-room');
-                    
-                    // LOBBY COUNTER
-                    if (!globalRoomUnsubscribe) {
-                        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'players'), (snapshot) => {
-                            const counts = {"GABRI RAUM": 0, "RAUM DES GABRIS": 0, "GABRILOGIE": 0, "GABRIELS": 0};
-                            const now = Date.now();
-                            snapshot.forEach(doc => { 
-                                const data = doc.data(); 
-                                if (data.roomId && counts[data.roomId] !== undefined && (now - data.lastSeen) < 20000) {
-                                    counts[data.roomId]++; 
-                                }
-                            });
-                            document.querySelectorAll('.room-btn').forEach(btn => { 
-                                const rName = btn.getAttribute('data-room'); 
-                                document.getElementById(`count-${rName}`).innerText = `${counts[rName]}/10`; 
-                            });
-                        });
-                    }
-                } else {
-                    throw new Error("Authentifizierung fehlgeschlagen.");
-                }
-            } catch (e) { 
-                console.error(e);
-                alert("Verbindungsfehler: " + e.message); 
-                document.getElementById('btnJoin').innerText = "SYSTEM STARTEN"; 
-                document.getElementById('btnJoin').disabled = false; 
+            // LOBBY COUNTER
+            if (!globalRoomUnsubscribe) {
+                onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'players'), (snapshot) => {
+                    const counts = {"GABRI RAUM": 0, "RAUM DES GABRIS": 0, "GABRILOGIE": 0, "GABRIELS": 0};
+                    const now = Date.now();
+                    snapshot.forEach(doc => { 
+                        const data = doc.data(); 
+                        if (data.roomId && counts[data.roomId] !== undefined && (now - data.lastSeen) < 20000) {
+                            counts[data.roomId]++; 
+                        }
+                    });
+                    document.querySelectorAll('.room-btn').forEach(btn => { 
+                        const rName = btn.getAttribute('data-room'); 
+                        document.getElementById(`count-${rName}`).innerText = `${counts[rName]}/10`; 
+                    });
+                });
             }
         });
 
@@ -1426,7 +1454,7 @@
                 });
 
                 setupFirebaseListeners();
-                requestAnimationFrame(gameLoop);
+                startGameLoop();
                 UIManager.switchScreen('screen-lobby');
             });
         });
@@ -1656,7 +1684,20 @@
         // ============================================================================
         // 9. GAME LOOP 
         // ============================================================================
+        let isGameLoopRunning = false;
+        function startGameLoop() {
+            if(isGameLoopRunning) return;
+            isGameLoopRunning = true;
+            lastUpdateTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
         function gameLoop(timestamp) {
+            if (!currentRoomId) {
+                isGameLoopRunning = false;
+                return; // Stop loop if we leave a room
+            }
+
             const dt = Math.min((timestamp - lastUpdateTime) / 1000, 0.1); 
             lastUpdateTime = timestamp; 
             const now = Date.now();
