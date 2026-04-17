@@ -432,9 +432,7 @@
         // ----------------------------------------------------------------------
         // 1. FIREBASE CONFIGURATION (ENTERPRISE STANDARD)
         // ----------------------------------------------------------------------
-        // DER ENTSCHEIDENDE FIX: Die App ID MUSS dynamisch vom System geholt werden,
-        // sonst blockiert Firebase die Lese-/Schreibrechte und das Spiel startet nie!
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-flucht-elite';
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'gabri-flucht-elite';
         
         const FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyDWM2Dnq72MeWuZcV3uT4YXg0G9nyZIVAc", 
@@ -546,7 +544,7 @@
         const MAP_WIDTH = 3000, MAP_HEIGHT = 4000; 
         const PLAYER_SIZE = 40, BASE_SPEED = 350, TAG_COOLDOWN_MS = 2000;
 
-        let currentUser = null, myName = "", currentRoom = "";
+        let currentUser = null, myName = "", currentRoomId = null;
         let serverPlayers = {}, gameEntities = {};
         
         // Synced Game State (from Firestore)
@@ -1047,10 +1045,10 @@
 
         const Actions = {
             doA() {
-                if (!currentRoom) return;
+                if (!currentRoomId) return;
                 
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoom);
-                const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid);
+                const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoomId);
+                const myRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid);
                 
                 const cx = myLocalPlayer.x + PLAYER_SIZE/2; 
                 const cy = myLocalPlayer.y + PLAYER_SIZE/2;
@@ -1131,7 +1129,7 @@
                     return;
                     
                 } else if (myHeldItem === 'mg') {
-                    if (now - lastMgShot < 150) return; 
+                    if (!gameState.isPlaying || now - lastMgShot < 150) return; 
                     
                     lastMgShot = now; 
                     sfx.sfxLaser();
@@ -1193,6 +1191,8 @@
                     return;
 
                 } else if (myHeldItem && myHeldItem.startsWith('sword')) {
+                    if (!gameState.isPlaying) return; // Only attack if round has started
+                    
                     lastSwordAttack = now; 
                     swordStartAngle = Math.atan2(myFacing.y, myFacing.x) - Math.PI/2;
                     Physics.spawnParticles(cx + myFacing.x*30, cy + myFacing.y*30, '#ffffff'); 
@@ -1282,9 +1282,9 @@
             
             doC() { 
                 // Drop Item Mechanism
-                if (!currentRoom || !myHeldItem) return;
+                if (!currentRoomId || !myHeldItem) return;
                 
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoom);
+                const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoomId);
                 const cx = myLocalPlayer.x + PLAYER_SIZE/2; 
                 const cy = myLocalPlayer.y + PLAYER_SIZE/2;
                 
@@ -1323,17 +1323,26 @@
             const btn = document.getElementById('btnPlay');
             
             try {
-                if (!auth.currentUser) {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                }
+                if (!auth) throw new Error("Firebase Konfiguration fehlerhaft.");
                 
-                // Listener for robust confirmation
-                onAuthStateChanged(auth, (user) => {
+                // Watchdog Timeout - falls Firebase blockiert wird (Adblocker etc.)
+                const watchDog = setTimeout(() => {
+                    if (!isAuthReady) {
+                        if (statusEl) {
+                            statusEl.innerText = "🔴 FEHLER: SERVER ANTWORTET NICHT (ADBLOCKER?)";
+                            statusEl.className = "text-xs text-red-400 text-center mb-3 font-bold bg-red-900 p-3 rounded border border-red-800";
+                        }
+                        if (btn) {
+                            btn.innerText = "FEHLER (SEITE NEU LADEN)";
+                            btn.disabled = true;
+                        }
+                    }
+                }, 8000);
+
+                // Passiver Auth-Listener (Verhindert Race-Conditions)
+                onAuthStateChanged(auth, async (user) => {
                     if (user) {
+                        clearTimeout(watchDog);
                         currentUser = user;
                         isAuthReady = true;
                         
@@ -1346,12 +1355,28 @@
                             btn.innerText = "SPIELEN";
                             btn.disabled = false;
                         }
+                    } else {
+                        // Nur einloggen, wenn WIRKLICH noch keine Session existiert
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                await signInWithCustomToken(auth, __initial_auth_token);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                        } catch (err) {
+                            clearTimeout(watchDog);
+                            console.error("Login Error:", err);
+                            if(statusEl) {
+                                statusEl.innerText = "🔴 OFFLINE: " + (err.code || "Verbindungsfehler");
+                                statusEl.className = "text-xs text-red-400 text-center mb-3 font-bold bg-gray-900 p-3 rounded border border-red-900";
+                            }
+                        }
                     }
                 });
             } catch (e) {
                 console.error("Auth Init Failed:", e);
                 if(statusEl) {
-                    statusEl.innerText = "🔴 OFFLINE: VERBINDUNGSFEHLER (" + e.code + ")";
+                    statusEl.innerText = "🔴 OFFLINE: " + e.message;
                     statusEl.className = "text-xs text-red-400 text-center mb-3 font-bold bg-gray-900 p-3 rounded border border-red-900";
                 }
             }
@@ -1380,30 +1405,33 @@
             sfx.enable(); 
             
             const roomSelect = document.getElementById('inputRoom');
-            currentRoom = roomSelect.options[roomSelect.selectedIndex].value;
+            currentRoomId = roomSelect.options[roomSelect.selectedIndex].value;
             
-            // Set Initial Spawn
+            // Set Initial Spawn (Mensa/Flur)
             myLocalPlayer.x = 1300 + Math.random()*200; 
             myLocalPlayer.y = 1000 + Math.random()*200;
             camera.x = myLocalPlayer.x - window.innerWidth/2; 
             camera.y = myLocalPlayer.y - window.innerHeight/2;
 
             // Register Player in DB
-            const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid);
+            const playerRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid);
             setDoc(playerRef, { 
                 id: currentUser.uid, 
                 name: myName, 
-                roomId: currentRoom, 
+                roomId: currentRoomId, 
                 x: myLocalPlayer.x, 
                 y: myLocalPlayer.y, 
                 timeAsGabri: 0, 
                 lastSeen: Date.now(), 
                 isStealth: false 
             }).then(() => {
-                // Success - Move to Lobby
+                // Success - Move directly to MAP (Warmup Mode)
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('game-hud').style.display = 'block';
-                document.getElementById('currentRoomDisplay').innerText = currentRoom;
+                document.getElementById('currentRoomDisplay').innerText = currentRoomId;
+                
+                // FORCE THE CANVAS TO BE VISIBLE DURING WARMUP!
+                document.body.classList.add('game-running'); 
                 
                 setupFirebaseListeners();
                 
@@ -1423,10 +1451,10 @@
         let roomUnsubscribe = null;
         
         function setupFirebaseListeners() {
-            if (!currentUser || !currentRoom) return; 
+            if (!currentUser || !currentRoomId) return; 
             
-            const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoom);
+            const playersRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'players');
+            const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoomId);
 
             // 1. SYNC PLAYERS
             if (playersUnsubscribe) playersUnsubscribe();
@@ -1436,7 +1464,7 @@
                     const docData = change.doc.data(); 
                     const docId = change.doc.id;
                     
-                    if (docData.roomId === currentRoom) {
+                    if (docData.roomId === currentRoomId) {
                         if (change.type === 'added' || change.type === 'modified') {
                             if (!serverPlayers[docId]) {
                                 serverPlayers[docId] = docData;
@@ -1467,13 +1495,13 @@
                 document.getElementById('lb-content').innerHTML = lbContent;
                 
                 // Allow anyone to start the game
-                let isHost = true; // Make it so ANYONE can click start in .io mode
+                let activeCount = activeIds.length;
                 const btnStart = document.getElementById('btnStartRound');
                 if (gameState.isPlaying) {
                     btnStart.style.display = 'none';
                 } else {
                     btnStart.style.display = 'block';
-                    btnStart.innerText = "RUNDE STARTEN";
+                    btnStart.innerText = `RUNDE STARTEN (${activeCount} SPIELER)`;
                     btnStart.disabled = false;
                 }
             });
@@ -1560,8 +1588,8 @@
                             document.getElementById('roleDisplay').innerHTML = `<span style="color:var(--primary)">LAUF! ${gName} ist Gabri!</span>`;
                         }
                     } else {
-                        document.getElementById('gameTimer').innerText = "WARMUP";
-                        document.getElementById('roleDisplay').innerText = "Erkunde die Map";
+                        document.getElementById('btnStartRound').style.display = 'block';
+                        document.getElementById('gameRole').innerText = "Erkunde die Map";
                         document.getElementById('hudStatusBox').classList.remove('is-gabri-alert');
                     }
                     
@@ -1574,9 +1602,9 @@
         }
 
         document.getElementById('btnStartRound').addEventListener('click', async () => {
-            if (!currentUser || !currentRoom) return;
+            if (!currentUser || !currentRoomId) return;
             try {
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoom);
+                const roomRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoomId);
                 const activeIds = Object.keys(serverPlayers); 
                 if(activeIds.length === 0) activeIds.push(currentUser.uid);
                 
@@ -1606,7 +1634,7 @@
                 });
 
                 for(let id of activeIds) {
-                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', id), { timeAsGabri: 0, lastSeen: Date.now() }).catch(()=>{});
+                    updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', id), { timeAsGabri: 0, lastSeen: Date.now() }).catch(()=>{});
                 }
             } catch (error) { 
                 alert("Start Fehler: " + error.message); 
@@ -1617,19 +1645,20 @@
             document.getElementById('screen-leaderboard').style.display = 'none';
             document.getElementById('login-screen').style.display = 'flex';
             document.getElementById('game-hud').style.display = 'none';
+            document.body.classList.remove('game-running');
             isGameRunning = false;
             
-            if (currentRoom) {
-                updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoom), { isPlaying: false }).catch(()=>{});
-                currentRoom = null;
+            if (currentRoomId) {
+                updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoomId), { isPlaying: false }).catch(()=>{});
+                currentRoomId = null;
             }
         });
 
         // Background Heartbeat
         setInterval(() => {
-            if (currentUser && currentRoom && isGameRunning && Date.now() - lastHeartbeatTs > 2000) {
+            if (currentUser && currentRoomId && isGameRunning && Date.now() - lastHeartbeatTs > 2000) {
                 lastHeartbeatTs = Date.now();
-                updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid), { lastSeen: lastHeartbeatTs }).catch(()=>{});
+                updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { lastSeen: lastHeartbeatTs }).catch(()=>{});
             }
         }, 2000);
 
@@ -1642,7 +1671,7 @@
                 // GAME OVER
                 document.getElementById('game-hud').style.display = 'none';
                 document.getElementById('screen-leaderboard').style.display = 'flex';
-                document.body.classList.remove('game-running');
+                document.body.classList.remove('game-running'); // MAP HIDE
                 isGameRunning = false;
                 
                 let results = [];
@@ -1728,174 +1757,178 @@
                         }
                         
                         if (Object.keys(updates).length > 0) {
-                            updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoom), updates).catch(()=>{});
+                            updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoomId), updates).catch(()=>{});
                         }
                     }
                 }
 
-                // GAMEPLAY TASKS (Warmup & Playing)
-                const move = Input.getVector();
-                if (dashSpeedMult > 1.0) { dashSpeedMult -= dt * 6; if (dashSpeedMult < 1.0) dashSpeedMult = 1.0; }
-                if (now > energyDrinkEndTime) activeSpeedMult = 1.0;
-
-                let mx = (move.dx * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vx) * dt;
-                let my = (move.dy * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vy) * dt;
-                kb_vx *= 0.85; kb_vy *= 0.85; 
-
-                // Stealth Mode
-                if (Math.abs(move.dx) < 0.1 && Math.abs(move.dy) < 0.1 && Math.abs(kb_vx) < 10 && Math.abs(kb_vy) < 10) {
-                    timeStandingStill += dt;
-                } else {
-                    timeStandingStill = 0; 
-                    const len = Math.hypot(move.dx, move.dy); 
-                    if (len > 0) myFacing = { x: move.dx/len, y: move.dy/len };
-                }
-                
-                let newStealth = timeStandingStill > 2.0;
-                if (newStealth !== isStealthMode) { 
-                    isStealthMode = newStealth; 
-                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid), { isStealth: isStealthMode }).catch(()=>{}); 
-                }
-
-                // ANTI STUCK COLLISION SYSTEM
-                let steps = 5; 
-                let stepX = mx / steps; 
-                let stepY = my / steps;
-                
-                for(let i=0; i<steps; i++) {
-                    if (!Physics.checkWall(myLocalPlayer.x + stepX, myLocalPlayer.y)) {
-                        myLocalPlayer.x += stepX; 
-                    } else { kb_vx = 0; }
+                // GAMEPLAY TASKS (Runs during Warmup AND Game!)
+                if (UIManager.screens.style.display === 'none') {
                     
-                    if (!Physics.checkWall(myLocalPlayer.x, myLocalPlayer.y + stepY)) {
-                        myLocalPlayer.y += stepY; 
-                    } else { kb_vy = 0; }
-                }
-                
-                // Check Stairs
-                if (now - lastStairTime >= 1000) {
-                    for (let s of stairs) {
-                        if (myLocalPlayer.x < s.x + s.w && myLocalPlayer.x + PLAYER_SIZE > s.x && myLocalPlayer.y < s.y + s.h && myLocalPlayer.y + PLAYER_SIZE > s.y) {
-                            myLocalPlayer.y = s.targetY; 
-                            lastStairTime = now; 
-                            Physics.spawnParticles(myLocalPlayer.x, myLocalPlayer.y, '#00ffcc'); 
-                            sfx.sfxDash(); 
-                            break;
-                        }
-                    }
-                }
+                    const move = Input.getVector();
+                    if (dashSpeedMult > 1.0) { dashSpeedMult -= dt * 6; if (dashSpeedMult < 1.0) dashSpeedMult = 1.0; }
+                    if (now > energyDrinkEndTime) activeSpeedMult = 1.0;
 
-                // Boss Knockback (Physics FIX)
-                if (gameState.boss_active && gameState.boss_hp > 0 && myLocalPlayer.y > 2000) {
-                    if (Math.hypot(myLocalPlayer.x - gameState.boss_x, myLocalPlayer.y - gameState.boss_y) < 100 && !isStealthMode) {
-                        const angleFromBoss = Math.atan2(myLocalPlayer.y - gameState.boss_y, myLocalPlayer.x - gameState.boss_x);
-                        kb_vx = Math.cos(angleFromBoss) * 3000; 
-                        kb_vy = Math.sin(angleFromBoss) * 3000; 
-                        Physics.spawnParticles(myLocalPlayer.x + 20, myLocalPlayer.y + 20, '#ff0000'); 
-                        sfx.playNoise(0.3, 1.0);
-                    }
-                }
+                    let mx = (move.dx * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vx) * dt;
+                    let my = (move.dy * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vy) * dt;
+                    kb_vx *= 0.85; kb_vy *= 0.85; 
 
-                // LOCAL BALL PHYSICS
-                if (!gameState.ball_owner && localBall.active) {
-                    let bnx = localBall.x + localBall.vx * dt; 
-                    let bny = localBall.y + localBall.vy * dt;
-                    let hitX = Physics.checkWall(bnx, localBall.y); 
-                    let hitY = Physics.checkWall(localBall.x, bny);
+                    // Stealth Mode
+                    if (Math.abs(move.dx) < 0.1 && Math.abs(move.dy) < 0.1 && Math.abs(kb_vx) < 10 && Math.abs(kb_vy) < 10) {
+                        timeStandingStill += dt;
+                    } else {
+                        timeStandingStill = 0; 
+                        const len = Math.hypot(move.dx, move.dy); 
+                        if (len > 0) myFacing = { x: move.dx/len, y: move.dy/len };
+                    }
                     
-                    if (hitX) { localBall.vx *= -0.7; sfx.sfxBounce(); } else localBall.x = bnx;
-                    if (hitY) { localBall.vy *= -0.7; sfx.sfxBounce(); } else localBall.y = bny;
+                    let newStealth = timeStandingStill > 2.0;
+                    if (newStealth !== isStealthMode) { 
+                        isStealthMode = newStealth; 
+                        updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { isStealth: isStealthMode }).catch(()=>{}); 
+                    }
+
+                    // ANTI STUCK COLLISION SYSTEM
+                    let steps = 5; 
+                    let stepX = mx / steps; 
+                    let stepY = my / steps;
                     
-                    localBall.vx *= 0.98; localBall.vy *= 0.98; 
-                    localBall.vz -= 800 * dt; 
-                    localBall.z += localBall.vz * dt;
-                    
-                    if (localBall.z < 0) {
-                        localBall.z = 0; 
-                        if (localBall.vz < -50) { 
-                            localBall.vz *= -0.6; 
-                            sfx.sfxBounce(); 
-                        } else { 
-                            localBall.vz = 0; localBall.vx *= 0.9; localBall.vy *= 0.9; 
-                        }
-                    }
-
-                    if (localBall.z > 80 && Math.hypot(localBall.x - (hoop.x + hoop.w/2), localBall.y - (hoop.y + 10)) < 40) {
-                        if (now - lastConfettiTs > 1000) {
-                            Physics.spawnConfetti(hoop.x + hoop.w/2, hoop.y + 10); 
-                            lastConfettiTs = now; 
-                            lastScoreTs = now; 
-                            updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoom), { lastScoreTs: now }).catch(()=>{}); 
-                        }
-                    }
-                }
-
-                // CAMERA LERP
-                const targetCamX = myLocalPlayer.x + PLAYER_SIZE/2 - canvas.width/2; 
-                const targetCamY = myLocalPlayer.y + PLAYER_SIZE/2 - canvas.height/2;
-                camera.x += (targetCamX - camera.x) * 10 * dt;
-                if (Math.abs(targetCamY - camera.y) > 1000) camera.y = targetCamY; 
-                else camera.y += (targetCamY - camera.y) * 10 * dt;
-                
-                camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width)); 
-                camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
-
-                // ENTITY INTERPOLATION
-                for(let id in serverPlayers) {
-                    if (id !== currentUser.uid && gameEntities[id]) {
-                        if (Math.abs(serverPlayers[id].y - gameEntities[id].y) > 1000) {
-                            gameEntities[id].y = serverPlayers[id].y;
-                        } else {
-                            gameEntities[id].y += (serverPlayers[id].y - gameEntities[id].y) * 15 * dt;
-                        }
-                        gameEntities[id].x += (serverPlayers[id].x - gameEntities[id].x) * 15 * dt;
-                    }
-                }
-
-                // SYNC POS
-                if (now - lastSyncTime > 100) { 
-                    lastSyncTime = now;
-                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid), { 
-                        x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y)
-                    }).catch(()=>{});
-                }
-
-                // TAG CHECK
-                if (gameState.isPlaying && localCurrentGabri === currentUser.uid && now >= localGabriSince + TAG_COOLDOWN_MS) {
-                    for (let id in serverPlayers) {
-                        if (id === currentUser.uid) continue;
-                        const p = gameEntities[id] || serverPlayers[id]; 
-                        if (serverPlayers[id].isStealth) continue; 
+                    for(let i=0; i<steps; i++) {
+                        if (!Physics.checkWall(myLocalPlayer.x + stepX, myLocalPlayer.y)) {
+                            myLocalPlayer.x += stepX; 
+                        } else { kb_vx = 0; }
                         
-                        if (Math.hypot((p.x+PLAYER_SIZE/2) - (myLocalPlayer.x+PLAYER_SIZE/2), (p.y+PLAYER_SIZE/2) - (myLocalPlayer.y+PLAYER_SIZE/2)) < PLAYER_SIZE * 0.9) { 
-                            Physics.spawnParticles(p.x, p.y, '#ff3366'); 
-                            try {
-                                Promise.all([
-                                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', currentUser.uid), { timeAsGabri: increment(now - localGabriSince) }),
-                                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoom), { currentGabri: id, tagCounter: increment(1) })
-                                ]);
-                            } catch(e) {}
-                            break;
+                        if (!Physics.checkWall(myLocalPlayer.x, myLocalPlayer.y + stepY)) {
+                            myLocalPlayer.y += stepY; 
+                        } else { kb_vy = 0; }
+                    }
+                    
+                    // Check Stairs
+                    if (now - lastStairTime >= 1000) {
+                        for (let s of stairs) {
+                            if (myLocalPlayer.x < s.x + s.w && myLocalPlayer.x + PLAYER_SIZE > s.x && myLocalPlayer.y < s.y + s.h && myLocalPlayer.y + PLAYER_SIZE > s.y) {
+                                myLocalPlayer.y = s.targetY; 
+                                lastStairTime = now; 
+                                Physics.spawnParticles(myLocalPlayer.x, myLocalPlayer.y, '#00ffcc'); 
+                                sfx.sfxDash(); 
+                                break;
+                            }
                         }
                     }
-                }
 
-                // UPDATE HUD
-                if (gameState.isPlaying) {
-                    const min = Math.floor(localTimeLeft / 60); 
-                    const sec = localTimeLeft % 60;
-                    document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+                    // Boss Knockback (Fix: Away from boss)
+                    if (gameState.boss_active && gameState.boss_hp > 0 && myLocalPlayer.y > 2000) {
+                        if (Math.hypot(myLocalPlayer.x - gameState.boss_x, myLocalPlayer.y - gameState.boss_y) < 100 && !isStealthMode) {
+                            const angleFromBoss = Math.atan2(myLocalPlayer.y - gameState.boss_y, myLocalPlayer.x - gameState.boss_x);
+                            kb_vx = Math.cos(angleFromBoss) * 3000; 
+                            kb_vy = Math.sin(angleFromBoss) * 3000; 
+                            Physics.spawnParticles(myLocalPlayer.x + 20, myLocalPlayer.y + 20, '#ff0000'); 
+                            sfx.playNoise(0.3, 1.0);
+                        }
+                    }
+
+                    // LOCAL BALL PHYSICS
+                    if (!gameState.ball_owner && localBall.active) {
+                        let bnx = localBall.x + localBall.vx * dt; 
+                        let bny = localBall.y + localBall.vy * dt;
+                        let hitX = Physics.checkWall(bnx, localBall.y); 
+                        let hitY = Physics.checkWall(localBall.x, bny);
+                        
+                        if (hitX) { localBall.vx *= -0.7; sfx.sfxBounce(); } else localBall.x = bnx;
+                        if (hitY) { localBall.vy *= -0.7; sfx.sfxBounce(); } else localBall.y = bny;
+                        
+                        localBall.vx *= 0.98; localBall.vy *= 0.98; 
+                        localBall.vz -= 800 * dt; 
+                        localBall.z += localBall.vz * dt;
+                        
+                        if (localBall.z < 0) {
+                            localBall.z = 0; 
+                            if (localBall.vz < -50) { 
+                                localBall.vz *= -0.6; 
+                                sfx.sfxBounce(); 
+                            } else { 
+                                localBall.vz = 0; localBall.vx *= 0.9; localBall.vy *= 0.9; 
+                            }
+                        }
+
+                        if (localBall.z > 80 && Math.hypot(localBall.x - (hoop.x + hoop.w/2), localBall.y - (hoop.y + 10)) < 40) {
+                            if (now - lastConfettiTs > 1000) {
+                                Physics.spawnConfetti(hoop.x + hoop.w/2, hoop.y + 10); 
+                                lastConfettiTs = now; 
+                                lastScoreTs = now; 
+                                updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoomId), { lastScoreTs: now }).catch(()=>{}); 
+                            }
+                        }
+                    }
+
+                    // CAMERA LERP
+                    const targetCamX = myLocalPlayer.x + PLAYER_SIZE/2 - canvas.width/2; 
+                    const targetCamY = myLocalPlayer.y + PLAYER_SIZE/2 - canvas.height/2;
+                    camera.x += (targetCamX - camera.x) * 10 * dt;
+                    if (Math.abs(targetCamY - camera.y) > 1000) camera.y = targetCamY; 
+                    else camera.y += (targetCamY - camera.y) * 10 * dt;
+                    
+                    camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - canvas.width)); 
+                    camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - canvas.height));
+
+                    // ENTITY INTERPOLATION
+                    for(let id in serverPlayers) {
+                        if (id !== currentUser.uid && gameEntities[id]) {
+                            if (Math.abs(serverPlayers[id].y - gameEntities[id].y) > 1000) {
+                                gameEntities[id].y = serverPlayers[id].y;
+                            } else {
+                                gameEntities[id].y += (serverPlayers[id].y - gameEntities[id].y) * 15 * dt;
+                            }
+                            gameEntities[id].x += (serverPlayers[id].x - gameEntities[id].x) * 15 * dt;
+                        }
+                    }
+
+                    // SYNC POS
+                    if (now - lastSyncTime > 100) { 
+                        lastSyncTime = now;
+                        updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { 
+                            x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y)
+                        }).catch(()=>{});
+                    }
+
+                    // TAG CHECK (Only when game is active)
+                    if (gameState.isPlaying && localCurrentGabri === currentUser.uid && now >= localGabriSince + TAG_COOLDOWN_MS) {
+                        for (let id in serverPlayers) {
+                            if (id === currentUser.uid) continue;
+                            const p = gameEntities[id] || serverPlayers[id]; 
+                            if (serverPlayers[id].isStealth) continue; 
+                            
+                            if (Math.hypot((p.x+PLAYER_SIZE/2) - (myLocalPlayer.x+PLAYER_SIZE/2), (p.y+PLAYER_SIZE/2) - (myLocalPlayer.y+PLAYER_SIZE/2)) < PLAYER_SIZE * 0.9) { 
+                                Physics.spawnParticles(p.x, p.y, '#ff3366'); 
+                                try {
+                                    Promise.all([
+                                        updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'players', currentUser.uid), { timeAsGabri: increment(now - localGabriSince) }),
+                                        updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'rooms', currentRoomId), { currentGabri: id, tagCounter: increment(1) })
+                                    ]);
+                                } catch(e) {}
+                                break;
+                            }
+                        }
+                    }
+
+                    // UPDATE HUD
+                    if (gameState.isPlaying) {
+                        const min = Math.floor(localTimeLeft / 60); 
+                        const sec = localTimeLeft % 60;
+                        document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+                    } else {
+                        document.getElementById('timerDisplay').innerText = "WARMUP";
+                    }
+                    
+                    let myTotal = serverPlayers[currentUser.uid]?.timeAsGabri || 0; 
+                    if (gameState.isPlaying && localCurrentGabri === currentUser.uid) myTotal += (now - localGabriSince);
+                    document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(myTotal/1000).toFixed(1)}s`;
+                    
+                    document.getElementById('floorDisplay').innerText = myLocalPlayer.y > 2000 ? "OBERGESCHOSS (OG)" : "ERDGESCHOSS (EG)";
+                
+                    drawFrame(dt, now);
                 }
-                
-                let myTotal = serverPlayers[currentUser.uid]?.timeAsGabri || 0; 
-                if (gameState.isPlaying && localCurrentGabri === currentUser.uid) myTotal += (now - localGabriSince);
-                document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(myTotal/1000).toFixed(1)}s`;
-                
-                document.getElementById('floorDisplay').innerText = myLocalPlayer.y > 2000 ? "OBERGESCHOSS (OG)" : "ERDGESCHOSS (EG)";
-            
-                drawFrame(dt, now);
             }
-            
             if(isGameRunning) requestAnimationFrame(gameLoop);
         }
 
@@ -1910,8 +1943,8 @@
                 let s = npc.speed; 
                 if (gameState.isPlaying && localTimeLeft > 0 && localTimeLeft <= 30 && npc.type === 'student') s *= 3; // Zombies are fast
                 
-                let nx = npc.currentX + npc.dirX * s * dt * 1000;
-                let ny = npc.currentY + npc.dirY * s * dt * 1000;
+                let nx = npc.currentX + npc.dirX * s * dt;
+                let ny = npc.currentY + npc.dirY * s * dt;
                 
                 if (!Physics.checkWall(nx, npc.currentY)) { 
                     npc.currentX = nx; 
