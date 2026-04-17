@@ -91,7 +91,7 @@
             transition: opacity 0.3s ease;
         }
 
-        .screen { display: none; width: 100%; max-width: 420px; padding: 25px; pointer-events: auto; }
+        .screen { display: none; width: 100%; max-width: 440px; padding: 25px; pointer-events: auto; }
         .screen.active { display: block; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 
         @keyframes slideUp {
@@ -145,6 +145,19 @@
         .btn-elite:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
         
         .btn-danger { background: linear-gradient(135deg, #ff3366 0%, #cc0033 100%); color: white; box-shadow: 0 4px 15px rgba(255, 51, 102, 0.3); }
+
+        /* ROOM LIST STYLES */
+        .room-list { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+        .room-btn { 
+            display: flex; justify-content: space-between; align-items: center;
+            width: 100%; padding: 16px 20px; 
+            background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.1);
+            color: white; border-radius: 12px; font-weight: 800; font-size: 16px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .room-btn:hover { border-color: var(--primary); box-shadow: 0 0 15px rgba(0,255,204,0.3); }
+        .room-btn:active { transform: scale(0.96); }
+        .room-count { color: var(--primary); font-size: 14px; text-shadow: 0 0 5px var(--primary); }
 
         .hud-header {
             display: flex;
@@ -262,17 +275,31 @@
         </div>
 
         <div id="screen-room" class="screen glass-panel">
-            <h2 class="text-2xl font-bold text-center text-white mb-2">SERVER RAUM</h2>
-            <p class="text-gray-300 text-center mb-6 text-sm">Erstelle einen Raum oder tritt bei.</p>
-            <input type="text" id="roomCodeInput" class="input-elite uppercase" placeholder="RAUM CODE (z.B. GABRI)" maxlength="8" autocomplete="off" style="text-transform: uppercase;">
-            <button id="btnJoinRoom" class="btn-elite">RAUM BETRETEN / ERSTELLEN</button>
+            <h2 class="text-2xl font-bold text-center text-white mb-2">SERVER AUSWAHL</h2>
+            <p class="text-gray-300 text-center mb-4 text-sm">Wähle einen der 4 Spielräume aus.</p>
+            
+            <div id="room-list" class="room-list">
+                <button class="room-btn" data-room="GABRI RAUM">
+                    GABRI RAUM <span class="room-count" id="count-GABRI RAUM">0 Spieler</span>
+                </button>
+                <button class="room-btn" data-room="RAUM DES GABRIS">
+                    RAUM DES GABRIS <span class="room-count" id="count-RAUM DES GABRIS">0 Spieler</span>
+                </button>
+                <button class="room-btn" data-room="GABRILOGIE">
+                    GABRILOGIE <span class="room-count" id="count-GABRILOGIE">0 Spieler</span>
+                </button>
+                <button class="room-btn" data-room="GABRIELS">
+                    GABRIELS <span class="room-count" id="count-GABRIELS">0 Spieler</span>
+                </button>
+            </div>
         </div>
 
         <div id="screen-lobby" class="screen glass-panel">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-primary m-0">LOBBY</h2>
-                <button id="btnCopyCode" class="bg-gray-800 text-white text-xs px-3 py-2 rounded-lg border border-gray-600 hover:border-primary transition-colors">CODE: <span id="lobbyTitleCode" class="text-primary font-bold"></span> 📋</button>
             </div>
+            <h3 id="lobbyTitleCode" class="text-white font-bold text-center mb-4 text-lg bg-gray-800 rounded py-2 border border-gray-600"></h3>
+            
             <p class="text-center text-gray-400 text-sm mb-4">Warte auf Mitspieler...</p>
             <div class="player-list p-2" id="lobbyPlayerList"></div>
             <button id="btnStartGame" class="btn-elite">RUNDE STARTEN (3 MIN)</button>
@@ -325,6 +352,9 @@
         let user = null;
         let myName = "Player";
         let currentRoomId = null; 
+        let globalRoomUnsubscribe = null;
+        let roomUnsubscribe = null;
+        let playersUnsubscribe = null;
         
         let serverPlayers = {}; 
         let gameEntities = {};  
@@ -345,8 +375,9 @@
         let lastStairTime = 0; 
         let lastConfettiTs = 0;
         let localTimeLeft = 0;
-        let lastHeartbeatTs = 0; // BUGFIX: Permanenter Heartbeat für die Lobby
+        let lastHeartbeatTs = 0; 
 
+        // Lokale Ball-Physik für perfekte Sync (verhindert Pickup Bug)
         let localBall = { active: true, x: 2200, y: 1500, z: 0, vx: 0, vy: 0, vz: 0 };
         let lastBallTs = 0;
 
@@ -362,7 +393,7 @@
         let lastSwordAttack = 0;
         let swordStartAngle = 0;
         
-        let isStealthMode = false; // FEATURE: Verstecken
+        let isStealthMode = false; 
         let timeStandingStill = 0;
 
         let kb_vx = 0;
@@ -452,7 +483,6 @@
                         obstacles.push({x: tx + 10, y: ty + 45, w: 20, h: 20, isChair: true, dir: 'down'});
                         obstacles.push({x: tx + 50, y: ty + 45, w: 20, h: 20, isChair: true, dir: 'down'});
                         
-                        // Deterministischer Energy Drink Spawn
                         if (c % 3 === 0 && r % 2 === 0) spawnDrinks.push({ id: 'ed_'+tx+'_'+ty, x: tx+30, y: ty+10 });
                     }
                 }
@@ -563,7 +593,10 @@
                     await signInAnonymously(auth);
                 }
                 user = auth.currentUser;
-                if (user) switchScreen('screen-room');
+                if (user) {
+                    startGlobalPlayerCount();
+                    switchScreen('screen-room');
+                }
             } catch (e) {
                 alert("Firebase Fehler beim Login: " + e.message);
                 document.getElementById('btnJoin').innerText = "SPIEL BEITRETEN";
@@ -586,10 +619,40 @@
             });
         }
 
-        document.getElementById('btnJoinRoom').addEventListener('click', () => {
-            let code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-            if (!code) code = Math.random().toString(36).substring(2, 6).toUpperCase();
-            currentRoomId = code;
+        // --- GLOBAL ROOM COUNTER ---
+        function startGlobalPlayerCount() {
+            const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
+            globalRoomUnsubscribe = onSnapshot(playersRef, (snapshot) => {
+                const counts = {"GABRI RAUM": 0, "RAUM DES GABRIS": 0, "GABRILOGIE": 0, "GABRIELS": 0};
+                const now = Date.now();
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Wenn der Spieler in einem der 4 Räume ist und in den letzten 20s ein Signal gesendet hat
+                    if (data.roomId && counts[data.roomId] !== undefined && (now - data.lastSeen) < 20000) {
+                        counts[data.roomId]++;
+                    }
+                });
+                
+                document.querySelectorAll('.room-btn').forEach(btn => {
+                    const rName = btn.getAttribute('data-room');
+                    document.getElementById(`count-${rName}`).innerText = `${counts[rName]} Spieler`;
+                });
+            });
+        }
+
+        document.querySelectorAll('.room-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const roomName = e.currentTarget.getAttribute('data-room');
+                joinRoom(roomName);
+            });
+        });
+
+        function joinRoom(roomName) {
+            if (globalRoomUnsubscribe) {
+                globalRoomUnsubscribe(); 
+                globalRoomUnsubscribe = null;
+            }
+            currentRoomId = roomName;
             document.getElementById('lobbyTitleCode').innerText = currentRoomId;
 
             myLocalPlayer.x = 1300 + Math.random()*100;
@@ -603,11 +666,7 @@
             setupFirebaseListeners();
             requestAnimationFrame(gameLoop);
             switchScreen('screen-lobby');
-        });
-
-        document.getElementById('btnCopyCode').addEventListener('click', () => {
-            if(currentRoomId) navigator.clipboard.writeText(currentRoomId);
-        });
+        }
 
         function setupFirebaseListeners() {
             if (!user || !currentRoomId) return; 
@@ -615,22 +674,34 @@
             const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
 
-            onSnapshot(playersRef, (snapshot) => {
-                const now = Date.now();
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (data.roomId === currentRoomId && now - data.lastSeen < 10000) {
-                        serverPlayers[doc.id] = data;
-                        if (!gameEntities[doc.id] && doc.id !== user.uid) gameEntities[doc.id] = { x: data.x, y: data.y };
-                    } else {
-                        delete serverPlayers[doc.id]; 
-                        if (doc.id !== user.uid) delete gameEntities[doc.id];
+            // --- LOBBY SYNC BUGFIX: Nutzt lokale Performance.now() anstatt unzuverlässige Systemzeit ---
+            playersUnsubscribe = onSnapshot(playersRef, (snapshot) => {
+                const localNow = performance.now();
+                
+                snapshot.docChanges().forEach(change => {
+                    const docData = change.doc.data();
+                    const docId = change.doc.id;
+                    
+                    if (docData.roomId === currentRoomId) {
+                        if (change.type === 'added' || change.type === 'modified') {
+                            if (!serverPlayers[docId]) {
+                                serverPlayers[docId] = docData;
+                                if (docId !== user.uid) gameEntities[docId] = { x: docData.x, y: docData.y };
+                            } else {
+                                Object.assign(serverPlayers[docId], docData);
+                            }
+                            serverPlayers[docId].localLastUpdate = localNow; // Lokaler Stempel!
+                        }
+                        if (change.type === 'removed') {
+                            delete serverPlayers[docId];
+                            delete gameEntities[docId];
+                        }
                     }
                 });
                 updateLobbyUI();
             });
 
-            onSnapshot(roomRef, (docSnap) => {
+            roomUnsubscribe = onSnapshot(roomRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const newState = docSnap.data();
                     if (newState.isPlaying && newState.roundId !== currentRoundId) {
@@ -920,7 +991,6 @@
             const isGabri = (localCurrentGabri === user.uid);
             const now = Date.now();
             
-            // PRIO 1: PALLETS (DbD Style)
             let nearestPallet = null; let minDistP = 120;
             for (let p of mapPallets) {
                 let pcx = p.dropRect.x + p.dropRect.w/2; let pcy = p.dropRect.y + p.dropRect.h/2;
@@ -1045,9 +1115,15 @@
                 return;
             }
 
-            if (!gameState.ball_owner && Math.hypot(cx - gameState.ball_x, cy - gameState.ball_y) < 100) {
-                myHeldItem = 'ball'; updateDoc(roomRef, { 'ball_owner': user.uid }); return;
+            // PERFEKTER PICKUP: Verwendet die lokalen, optischen Ball-Koordinaten (localBall.x) statt gameState.ball_x
+            if (!gameState.ball_owner && localBall.active) {
+                if (Math.hypot(cx - localBall.x, cy - localBall.y) < 100) {
+                    myHeldItem = 'ball'; 
+                    updateDoc(roomRef, { 'ball_owner': user.uid, 'ball_x': localBall.x, 'ball_y': localBall.y }); 
+                    return;
+                }
             }
+
             if (gameState.mg_dropped && !gameState.mg_owner && Math.hypot(cx - gameState.mg_x, cy - gameState.mg_y) < 100) {
                 myHeldItem = 'mg'; updateDoc(roomRef, { mg_owner: user.uid }); return;
             }
@@ -1059,7 +1135,6 @@
                 }
             }
             
-            // Energy Drink Check
             for(let d of spawnDrinks) {
                 if (gameState.energy_drinks && gameState.energy_drinks[d.id]) continue;
                 if (Math.hypot(cx - d.x, cy - d.y) < 60) {
@@ -1123,7 +1198,7 @@
             for (let id in serverPlayers) {
                 if (id === user.uid) continue;
                 const p = gameEntities[id] || serverPlayers[id];
-                if (serverPlayers[id].isStealth) continue; // Gabri kann keine versteckten Spieler taggen!
+                if (serverPlayers[id].isStealth) continue; 
                 
                 const cx1 = myLocalPlayer.x + PLAYER_SIZE/2; const cy1 = myLocalPlayer.y + PLAYER_SIZE/2;
                 const cx2 = p.x + PLAYER_SIZE/2; const cy2 = p.y + PLAYER_SIZE/2;
@@ -1145,7 +1220,7 @@
             }
         }
 
-        // --- GLOBALER HEARTBEAT (BEHEBT DEN LOBBY-BUG!) ---
+        // LOBBY SYNC FIX: Permanente Heartbeats damit man nicht in der Lobby verschwindet
         setInterval(() => {
             const now = Date.now();
             if (user && currentRoomId && now - lastHeartbeatTs > 2000) {
@@ -1161,7 +1236,18 @@
             const now = Date.now();
 
             if (user) {
-                
+                // Entferne inaktive Spieler basierend auf der lokalen Empfangszeit (Beseitigt Clock-Skew!)
+                const localNow = performance.now();
+                let dirtyLobby = false;
+                for (let id in serverPlayers) {
+                    if (id !== user.uid && localNow - serverPlayers[id].localLastUpdate > 15000) {
+                        delete serverPlayers[id];
+                        delete gameEntities[id];
+                        dirtyLobby = true;
+                    }
+                }
+                if (dirtyLobby) updateLobbyUI();
+
                 if (gameState.isPlaying && gameState.endTime > 0) {
                     localTimeLeft = Math.max(0, Math.floor((gameState.endTime - now) / 1000));
                     
@@ -1214,7 +1300,6 @@
                     let my = (move.dy * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vy) * dt;
                     kb_vx *= 0.85; kb_vy *= 0.85; 
 
-                    // Verstecken (Stealth)
                     if (Math.abs(move.dx) < 0.1 && Math.abs(move.dy) < 0.1 && kb_vx < 1 && kb_vy < 1) {
                         timeStandingStill += dt;
                     } else {
@@ -1496,7 +1581,7 @@
                 
                 let stealth = isMe ? isStealthMode : sp.isStealth;
                 if (stealth) {
-                    ctx.globalAlpha = 0.4; // Versteckt
+                    ctx.globalAlpha = 0.4; 
                     ctx.drawImage(isGabri ? texGabri[frame] : texNormal[frame], px, py + 15, PLAYER_SIZE, PLAYER_SIZE - 15);
                 } else {
                     ctx.drawImage(isGabri ? texGabri[frame] : texNormal[frame], px, py, PLAYER_SIZE, PLAYER_SIZE);
@@ -1548,7 +1633,6 @@
                 }
             }
 
-            // NIGHT MODE ANOMALY (Letzte 30 Sekunden)
             if (localTimeLeft > 0 && localTimeLeft <= 30) {
                 ctx.fillStyle = 'rgba(2, 2, 5, 0.96)'; 
                 ctx.fillRect(camera.x, camera.y, canvas.width, canvas.height);
@@ -1571,14 +1655,12 @@
 
             ctx.restore(); 
 
-            // UI OVERLAY: JOYSTICKS & BUTTONS
             ctx.save();
             ctx.beginPath(); ctx.arc(joyBase.x, joyBase.y, joyBase.r, 0, Math.PI*2);
             ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
             ctx.beginPath(); ctx.arc(joystick.nx, joystick.ny, 25, 0, Math.PI*2);
             ctx.fillStyle = 'rgba(0, 255, 204, 0.4)'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 15; ctx.fill();
             
-            // A Button (Aktion)
             ctx.beginPath(); ctx.arc(btnA.x, btnA.y, btnA.r, 0, Math.PI*2);
             ctx.fillStyle = btnA.active ? 'rgba(255,51,102,0.6)' : 'rgba(255,51,102,0.2)'; 
             ctx.strokeStyle = 'rgba(255,51,102,0.4)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
@@ -1586,7 +1668,6 @@
             ctx.fillText("A", btnA.x, btnA.y-8);
             ctx.font = '10px "Outfit"'; ctx.fillText("(SPACE)", btnA.x, btnA.y+8);
 
-            // B Button (Dash)
             ctx.beginPath(); ctx.arc(btnB.x, btnB.y, btnB.r, 0, Math.PI*2);
             ctx.fillStyle = btnB.active ? 'rgba(0,255,204,0.6)' : 'rgba(0,255,204,0.2)'; 
             ctx.strokeStyle = 'rgba(0,255,204,0.4)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
