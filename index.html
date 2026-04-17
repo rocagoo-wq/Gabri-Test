@@ -240,7 +240,7 @@
             <h1>GABRI<br><span style="color:white; font-size: 16px;">FLUCHT</span></h1>
             <p class="text-gray-300 text-center mb-6 text-sm">
                 Überlebe den Schulhof.<br>
-                <span class="text-xs text-primary">(Touch-Joysticks oder WASD/Leertaste)</span>
+                <span class="text-xs text-primary">(Touch-Joysticks, WASD, A=Leertaste, B=Shift)</span>
             </p>
             <input type="text" id="playerNameInput" class="input-elite" placeholder="Dein Name" maxlength="12" autocomplete="off">
             <button id="btnJoin" class="btn-elite">WEITER</button>
@@ -315,7 +315,8 @@
             ball_x: 2200, ball_y: 1500, ball_vx: 0, ball_vy: 0, ball_owner: null, ball_ts: 0,
             boss_active: false, boss_hp: 500, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
             sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null,
-            mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null
+            mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null,
+            dead_npcs: {} // Array zum Speichern der getöteten NPCs
         };
         
         let currentRoundId = null;
@@ -326,7 +327,7 @@
         let lastStairTime = 0; 
         let lastConfettiTs = 0;
 
-        // Lokale Ball-Physik für perfekte Sync ohne Server-Lag
+        // Lokale Ball-Physik für perfekte Sync
         let localBall = { active: false, x: 2200, y: 1500, z: 0, vx: 0, vy: 0, vz: 0 };
         let lastBallTs = 0;
 
@@ -337,6 +338,8 @@
         let dashSpeedMult = 1.0;
         let lastDashTime = 0;
         let lastMgShot = 0;
+        let lastSwordAttack = 0;
+        let swordStartAngle = 0;
         
         let kb_vx = 0;
         let kb_vy = 0;
@@ -356,6 +359,7 @@
         let obstacles = [];
         let labels = [];
         let stairs = [];
+        let npcs = []; // Die 100 Charaktere
         
         const hoop = { x: 2200, y: 1220, w: 100, h: 20 };
 
@@ -442,25 +446,54 @@
         stairs.push({ x: 1225, y: 1500, w: 150, h: 150, targetY: 3500, label: 'ZUM OG' });
         stairs.push({ x: 1225, y: 3500, w: 150, h: 150, targetY: 1500, label: 'ZUM EG' });
 
-        const teachers = [
-            { startX: 1300, startY: 800, moveX: 0, moveY: 600, speed: 0.001, name: "Herr Müller", currentX: 0, currentY: 0 },
-            { startX: 200, startY: 800, moveX: 600, moveY: 0, speed: 0.0015, name: "Frau Schmidt", currentX: 0, currentY: 0 },
-            { startX: 1300, startY: 2800, moveX: 0, moveY: 500, speed: 0.0012, name: "Herr Weber", currentX: 0, currentY: 0 }
-        ];
+        // --- NPC GENERATOR (100 Personen) ---
+        function mulberry32(a) {
+            return function() {
+              var t = a += 0x6D2B79F5;
+              t = Math.imul(t ^ t >>> 15, t | 1);
+              t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+              return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            }
+        }
+        const prng = mulberry32(12345); 
+
+        for (let i = 0; i < 100; i++) {
+            let type, sx, sy, mx, my, spd;
+            if (i < 5) { // 5 Lehrer
+                type = 'teacher';
+                sx = 1300 + prng() * 400; sy = 800 + prng() * 2000;
+                mx = (prng() - 0.5) * 600; my = (prng() - 0.5) * 600; spd = 0.001;
+            } else if (i < 15) { // 10 Cheerleader in der Turnhalle
+                type = 'cheerleader';
+                sx = 1600 + prng() * 1200; sy = 1300 + prng() * 500;
+                mx = 0; my = 0; spd = 0.005 + prng()*0.002;
+            } else { // 85 Schüler (Hindernisse)
+                type = 'student';
+                let valid = false;
+                while(!valid) {
+                    sx = 100 + prng() * (MAP_WIDTH - 200);
+                    sy = prng() * (MAP_HEIGHT - 200);
+                    if (sy > 1900 && sy < 2100) continue; // Nicht in der Trennwand spawnen
+                    // Grober Wand Check
+                    valid = !obstacles.some(o => o.isWall && sx < o.x+o.w && sx+40>o.x && sy<o.y+o.h && sy+40>o.y);
+                }
+                mx = (prng() - 0.5) * 400; my = (prng() - 0.5) * 400; spd = 0.0005 + prng() * 0.001;
+            }
+            npcs.push({ id: i, startX: sx, startY: sy, moveX: mx, moveY: my, speed: spd, type: type, currentX: sx, currentY: sy });
+        }
 
         function createPixelSprite(type, frame=0) {
             const canvas = document.createElement('canvas');
             canvas.width = 12; canvas.height = 12;
             const ctx = canvas.getContext('2d');
             
-            const isGabri = type === 'gabri';
-            const isTeacher = type === 'teacher';
-            const isBoss = type === 'boss';
+            let skin = '#ffcba4', shirt = '#00ffcc', pants = '#1a1a24', hair = '#1a1a24';
 
-            const skin = isGabri ? '#ff99aa' : (isTeacher ? '#eebb99' : (isBoss ? '#ff4444' : '#ffcba4'));
-            const shirt = isGabri ? '#ff3366' : (isTeacher ? '#555555' : (isBoss ? '#220000' : '#00ffcc'));
-            const pants = isBoss ? '#110000' : '#1a1a24';
-            const hair = isTeacher ? '#cccccc' : (isBoss ? '#ffaa00' : '#1a1a24');
+            if (type === 'gabri') { skin = '#ff99aa'; shirt = '#ff3366'; }
+            else if (type === 'teacher') { skin = '#eebb99'; shirt = '#555555'; hair = '#cccccc'; }
+            else if (type === 'boss') { skin = '#ff4444'; shirt = '#220000'; pants = '#110000'; hair = '#ffaa00'; }
+            else if (type === 'cheerleader') { skin = '#ffcba4'; shirt = '#ff66b2'; pants = '#ffffff'; hair = '#ffee66'; }
+            else if (type === 'student') { shirt = '#3366ff'; pants = '#444444'; hair = '#5c3a21'; } // Standard Schüler
 
             let layout = [
                 [0,0,0,0,6,6,6,6,0,0,0,0], [0,0,0,6,2,2,2,2,6,0,0,0], [0,0,6,2,0,2,2,0,2,6,0,0],
@@ -468,6 +501,11 @@
                 [0,3,3,3,3,3,3,3,3,3,3,0], [0,3,3,3,3,3,3,3,3,3,3,0], [0,3,0,4,4,4,4,4,4,0,3,0],
                 [0,0,0,4,4,0,0,4,4,0,0,0], [0,0,5,5,0,0,0,0,5,5,0,0]
             ];
+
+            if (type === 'cheerleader') {
+                // Pom-Poms in den Händen
+                layout[5][0] = 3; layout[5][11] = 3; layout[6][0] = 3; layout[6][11] = 3;
+            }
 
             if (frame === 1) {
                 layout[9] = [0,0,0,4,4,0,0,0,0,0,0,0];
@@ -492,6 +530,8 @@
         const texNormal = [createPixelSprite('normal', 0), createPixelSprite('normal', 1)];
         const texGabri = [createPixelSprite('gabri', 0), createPixelSprite('gabri', 1)];
         const texTeacher = [createPixelSprite('teacher', 0), createPixelSprite('teacher', 1)];
+        const texStudent = [createPixelSprite('student', 0), createPixelSprite('student', 1)];
+        const texCheer = [createPixelSprite('cheerleader', 0), createPixelSprite('cheerleader', 1)];
         const texBoss = [createPixelSprite('boss', 0), createPixelSprite('boss', 1)];
 
         const initAuth = async () => {
@@ -637,7 +677,8 @@
                     ball_x: 2200, ball_y: 1500, ball_vx: 0, ball_vy: 0, ball_owner: null, ball_ts: 0,
                     boss_active: false, boss_hp: 500, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
                     sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null,
-                    mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null
+                    mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null,
+                    dead_npcs: {} // Array zum Speichern der getöteten NPCs (Laser/Schwert)
                 });
 
                 for(let id of activeIds) {
@@ -730,8 +771,8 @@
         const ctx = canvas.getContext('2d');
         
         let joyBase = { x: 120, y: window.innerHeight - 120, r: 70 };
-        let btnA = { x: window.innerWidth - 100, y: window.innerHeight - 100, r: 40, active: false };
-        let btnB = { x: window.innerWidth - 200, y: window.innerHeight - 150, r: 40, active: false };
+        let btnA = { x: window.innerWidth - 100, y: window.innerHeight - 100, r: 45, active: false };
+        let btnB = { x: window.innerWidth - 200, y: window.innerHeight - 150, r: 45, active: false };
         
         let joystick = { active: false, id: null, nx: joyBase.x, ny: joyBase.y, dx: 0, dy: 0 };
         let keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false, ' ': false, 'shift': false };
@@ -739,8 +780,8 @@
         window.addEventListener('resize', () => { 
             canvas.width = window.innerWidth; canvas.height = window.innerHeight; 
             joyBase = { x: 120, y: window.innerHeight - 120, r: 70 };
-            btnA = { x: window.innerWidth - 100, y: window.innerHeight - 100, r: 40, active: false };
-            btnB = { x: window.innerWidth - 200, y: window.innerHeight - 150, r: 40, active: false };
+            btnA = { x: window.innerWidth - 100, y: window.innerHeight - 100, r: 45, active: false };
+            btnB = { x: window.innerWidth - 200, y: window.innerHeight - 150, r: 45, active: false };
         });
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
@@ -768,7 +809,7 @@
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             for(let t of e.changedTouches) {
-                if (Math.hypot(t.clientX - joyBase.x, t.clientY - joyBase.y) < joyBase.r * 2 && !joystick.active) {
+                if (Math.hypot(t.clientX - joyBase.x, t.clientY - joyBase.y) < joyBase.r * 2.5 && !joystick.active) {
                     joystick.active = true; joystick.id = t.identifier;
                     joystick.nx = t.clientX; joystick.ny = t.clientY;
                     clampJoy();
@@ -917,6 +958,14 @@
                             hitTarget = 'boss'; break;
                         }
                     }
+                    // NPC getroffen?
+                    for(let npc of npcs) {
+                        if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue;
+                        let sameFloor = (cy > 2000 && npc.currentY > 2000) || (cy < 2000 && npc.currentY < 2000);
+                        if (sameFloor && Math.hypot(lx - (npc.currentX+20), ly - (npc.currentY+20)) < 30) {
+                            hitTarget = 'npc_' + npc.id; break;
+                        }
+                    }
                     // Spieler getroffen?
                     for(let id in serverPlayers) {
                         if (id === user.uid) continue;
@@ -932,7 +981,10 @@
                 let updates = { last_laser: { x1: cx, y1: cy, x2: lx, y2: ly, ts: now } };
                 if (hitTarget) {
                     if (hitTarget === 'boss') {
-                        updates.boss_hp = increment(-10);
+                        updates.boss_hp = increment(-50); // MG zerschreddert Boss
+                    } else if (hitTarget.startsWith('npc_')) {
+                        let npcId = hitTarget.split('_')[1];
+                        updates['dead_npcs.' + npcId] = true;
                     } else {
                         // Spieler extrem stark wegstoßen
                         updates[`knockback_${hitTarget}`] = { vx: myFacing.x * 1800, vy: myFacing.y * 1800, ts: now };
@@ -942,14 +994,32 @@
                 return;
 
             } else if (myHeldItem && myHeldItem.startsWith('sword')) {
+                lastSwordAttack = now; // Starte Schweranimation lokal
+                swordStartAngle = Math.atan2(myFacing.y, myFacing.x) - Math.PI/2;
                 createParticles(cx + myFacing.x*30, cy + myFacing.y*30, '#ffffff'); 
+                
+                let updates = {};
+
+                // Hit Boss
                 if (gameState.boss_active && gameState.boss_hp > 0) {
                     const distToBoss = Math.hypot(cx - (gameState.boss_x + 60), cy - (gameState.boss_y + 60));
                     if (distToBoss < 150) {
-                        updateDoc(roomRef, { 'boss_hp': increment(-20) }); // Schwert macht mehr Schaden
+                        updates.boss_hp = increment(-50); // 50 Damage pro Schlag
                         createParticles(gameState.boss_x + 60, gameState.boss_y + 60, '#ffcc00'); 
                     }
                 }
+
+                // Hit NPCs
+                for(let npc of npcs) {
+                    if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue;
+                    let sameFloor = (cy > 2000 && npc.currentY > 2000) || (cy < 2000 && npc.currentY < 2000);
+                    // Schwert Reichweite
+                    if (sameFloor && Math.hypot(cx + myFacing.x*50 - (npc.currentX+20), cy + myFacing.y*50 - (npc.currentY+20)) < 60) {
+                        updates['dead_npcs.' + npc.id] = true;
+                        createParticles(npc.currentX + 20, npc.currentY + 20, '#ff0000');
+                    }
+                }
+                if (Object.keys(updates).length > 0) updateDoc(roomRef, updates);
                 return;
             }
 
@@ -987,6 +1057,10 @@
                 if (gameState['pallet_'+p.id] === 1) { 
                     if (nx < p.dropRect.x + p.dropRect.w && nx + PLAYER_SIZE > p.dropRect.x && ny < p.dropRect.y + p.dropRect.h && ny + PLAYER_SIZE > p.dropRect.y) return true;
                 }
+            }
+            for (let npc of npcs) {
+                if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue;
+                if (nx < npc.currentX + PLAYER_SIZE && nx + PLAYER_SIZE > npc.currentX && ny < npc.currentY + PLAYER_SIZE && ny + PLAYER_SIZE > npc.currentY) return true;
             }
             return false;
         }
@@ -1173,6 +1247,13 @@
         }
 
         function render(dt, nowTime) {
+            // NPCs Update
+            npcs.forEach(npc => {
+                const offset = Math.sin(nowTime * npc.speed);
+                npc.currentX = npc.startX + npc.moveX * offset;
+                npc.currentY = npc.startY + npc.moveY * offset;
+            });
+
             const isInOG = camera.y > 1500;
             ctx.fillStyle = isInOG ? '#0b111a' : '#0d0d12'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1243,6 +1324,22 @@
                 ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.font = 'bold 36px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(l.text, l.x, l.y);
             }
 
+            // NPCs (Schüler & Lehrer & Cheerleader)
+            for(let npc of npcs) {
+                if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue; // Überspringen wenn tot
+                if ((isInOG && npc.currentY < 2000) || (!isInOG && npc.currentY > 2000)) continue;
+
+                ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; ctx.imageSmoothingEnabled = false;
+                
+                let isMoving = Math.abs(npc.moveX) > 0 || Math.abs(npc.moveY) > 0;
+                let frame = isMoving ? Math.floor(nowTime / 150) % 2 : 0;
+                let sprite = texStudent[frame];
+                if (npc.type === 'teacher') sprite = texTeacher[frame];
+                else if (npc.type === 'cheerleader') sprite = texCheer[frame];
+
+                ctx.drawImage(sprite, npc.currentX, npc.currentY, PLAYER_SIZE, PLAYER_SIZE); ctx.shadowBlur = 0;
+            }
+
             if (isInOG) {
                 for(let i=1; i<=4; i++) {
                     let sKey = 'sword'+i;
@@ -1256,8 +1353,8 @@
 
             // MG Drop Rendern
             if (isInOG && gameState.mg_dropped && !gameState.mg_owner) {
-                ctx.fillStyle = '#444'; ctx.fillRect(gameState.mg_x - 15, gameState.mg_y, 30, 8); // Lauf
-                ctx.fillStyle = '#222'; ctx.fillRect(gameState.mg_x - 5, gameState.mg_y + 8, 10, 10); // Griff
+                ctx.fillStyle = '#444'; ctx.fillRect(gameState.mg_x - 15, gameState.mg_y, 30, 8); 
+                ctx.fillStyle = '#222'; ctx.fillRect(gameState.mg_x - 5, gameState.mg_y + 8, 10, 10); 
             }
 
             if (isInOG && gameState.boss_active && gameState.boss_hp > 0) {
@@ -1279,23 +1376,23 @@
                 }
                 
                 ctx.fillStyle = '#ff0000'; ctx.fillRect(bx, by - 20, 120, 12);
-                ctx.fillStyle = '#00ffcc'; ctx.fillRect(bx, by - 20, 120 * (gameState.boss_hp/500), 12);
+                ctx.fillStyle = '#00ffcc'; ctx.fillRect(bx, by - 20, 120 * (Math.max(0, gameState.boss_hp)/500), 12);
                 ctx.fillStyle = '#ffffff'; ctx.font = 'bold 16px "Outfit"'; ctx.textAlign = 'center';
                 ctx.fillText("ISHIN", bx + 60, by - 30);
             }
 
             // Laser Strahl Rendern
             if (gameState.last_laser && nowTime - gameState.last_laser.ts < 150) {
-                ctx.strokeStyle = 'rgba(255, 51, 102, 0.8)'; // Neon Rot
+                ctx.strokeStyle = 'rgba(255, 51, 102, 0.8)'; 
                 ctx.lineWidth = 6;
                 ctx.beginPath();
                 ctx.moveTo(gameState.last_laser.x1, gameState.last_laser.y1);
                 ctx.lineTo(gameState.last_laser.x2, gameState.last_laser.y2);
                 ctx.stroke();
-                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); // Innerer Strahl
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); 
             }
 
-            // Ball Rendern (Mit lokaler Physik)
+            // Ball Rendern 
             let drawBallX = localBall.x; let drawBallY = localBall.y; let drawBallZ = localBall.z;
             if (gameState.ball_owner) {
                 const owner = serverPlayers[gameState.ball_owner] || (gameState.ball_owner === user.uid ? myLocalPlayer : null);
@@ -1345,7 +1442,19 @@
                 }
                 
                 if (playerHeldItem && playerHeldItem.startsWith('sword')) {
-                    ctx.fillStyle = '#aaaaaa'; ctx.fillRect(px + 35, py - 5, 6, 30);
+                    // Schwert Animation Zeichnen
+                    if (isMe && nowTime - lastSwordAttack < 200) {
+                        let prog = (nowTime - lastSwordAttack) / 200;
+                        ctx.save();
+                        ctx.translate(px + 20, py + 20);
+                        ctx.rotate(swordStartAngle + (prog * Math.PI)); 
+                        ctx.fillStyle = '#aaaaaa'; ctx.fillRect(15, -3, 30, 6);
+                        ctx.fillStyle = '#ffcc00'; ctx.fillRect(10, -9, 6, 18);
+                        ctx.restore();
+                    } else {
+                        ctx.fillStyle = '#aaaaaa'; ctx.fillRect(px + 35, py - 5, 6, 30);
+                        ctx.fillStyle = '#ffcc00'; ctx.fillRect(px + 31, py + 20, 14, 6); // Guard
+                    }
                 } else if (playerHeldItem === 'mg') {
                     ctx.fillStyle = '#444'; ctx.fillRect(px + 10, py + 15, 30, 6);
                 }
@@ -1366,22 +1475,28 @@
 
             ctx.restore(); 
 
+            // UI OVERLAY: JOYSTICKS & BUTTONS
             ctx.save();
             ctx.beginPath(); ctx.arc(joyBase.x, joyBase.y, joyBase.r, 0, Math.PI*2);
             ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
             ctx.beginPath(); ctx.arc(joystick.nx, joystick.ny, 25, 0, Math.PI*2);
             ctx.fillStyle = 'rgba(0, 255, 204, 0.4)'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 15; ctx.fill();
             
+            // A Button
             ctx.beginPath(); ctx.arc(btnA.x, btnA.y, btnA.r, 0, Math.PI*2);
             ctx.fillStyle = btnA.active ? 'rgba(255,51,102,0.6)' : 'rgba(255,51,102,0.2)'; 
             ctx.strokeStyle = 'rgba(255,51,102,0.4)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
             ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = 'bold 16px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText("A", btnA.x, btnA.y);
+            ctx.fillText("A", btnA.x, btnA.y-8);
+            ctx.font = '10px "Outfit"'; ctx.fillText("(SPACE)", btnA.x, btnA.y+8);
 
+            // B Button
             ctx.beginPath(); ctx.arc(btnB.x, btnB.y, btnB.r, 0, Math.PI*2);
             ctx.fillStyle = btnB.active ? 'rgba(0,255,204,0.6)' : 'rgba(0,255,204,0.2)'; 
             ctx.strokeStyle = 'rgba(0,255,204,0.4)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
-            ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillText("B", btnB.x, btnB.y);
+            ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = 'bold 16px "Outfit"'; 
+            ctx.fillText("B", btnB.x, btnB.y-8);
+            ctx.font = '10px "Outfit"'; ctx.fillText("(SHIFT)", btnB.x, btnB.y+8);
             ctx.restore();
         }
     </script>
