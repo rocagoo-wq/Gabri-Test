@@ -122,7 +122,7 @@
 <div id="menu">
   <!-- MAIN MENU -->
   <div class="box" id="mainMenu">
-    <span class="tag">v3.2 / GABRI-FLUCHT PvP</span>
+    <span class="tag">v3.1 / GABRI-FLUCHT PvP</span>
     <h1>GABRI<br>FLUCHT<span class="sub">· EINER IST ES ·</span></h1>
     <div class="hint">
       Einer ist der GABRI und muss die anderen berühren.<br>
@@ -168,7 +168,7 @@
 "use strict";
 
 /* =============================================================
-   GABRI-FLUCHT 3.2 — Core Engine + Multiplayer Integration
+   GABRI-FLUCHT 3.1 — Diagnostic & Multiplayer Edition
    ============================================================= */
 
 const DBG = document.getElementById("debug");
@@ -247,119 +247,135 @@ try {
     syncInt: null
   };
 
-  /* ---------- FIREBASE ---------- */
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-flucht-3-2';
-  let fb = null, db = null, auth = null, user = null;
+ /* ---------- FIREBASE ---------- */
+ const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-flucht-3-2';
+ let fb = null, db = null, auth = null, user = null;
 
-  async function initFB() {
-    if (fb) return true;
-    try {
-      if (typeof __firebase_config === 'undefined') throw new Error("Firebase Config fehlt in dieser Umgebung.");
-      const config = JSON.parse(__firebase_config);
-      
-      const appMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
-      const authMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-      const dbMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+ async function initFB() {
+   if (fb) return true;
+   try {
+     let config;
+     
+     // Prüfe, ob das System die Config automatisch bereitstellt
+     if (typeof __firebase_config !== 'undefined') {
+       config = JSON.parse(__firebase_config);
+     } else {
+       // ============================================================================
+       // 🟢 LOKALES MULTIPLAYER SETUP (AKTIVIERT):
+       // ============================================================================
+       config = {
+         apiKey: "AIzaSyD96dILjyTPxKmm0AFgrCeo9OToIRy8294",
+         authDomain: "gabri-game-f55cf.firebaseapp.com",
+         projectId: "gabri-game-f55cf",
+         storageBucket: "gabri-game-f55cf.firebasestorage.app",
+         messagingSenderId: "264922930578",
+         appId: "1:264922930578:web:65a583545f58c09219b54b"
+       };
+     }
+     
+     // Dynamischer Import der Firebase-Module (Browser-kompatibel)
+     const appMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+     const authMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+     const dbMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
-      const app = appMod.initializeApp(config);
-      auth = authMod.getAuth(app);
-      db = dbMod.getFirestore(app);
-      
-      fb = { 
-        doc: dbMod.doc, setDoc: dbMod.setDoc, deleteDoc: dbMod.deleteDoc, 
-        collection: dbMod.collection, onSnapshot: dbMod.onSnapshot 
-      };
+     const app = appMod.initializeApp(config);
+     auth = authMod.getAuth(app);
+     db = dbMod.getFirestore(app);
+     
+     fb = { 
+       doc: dbMod.doc, setDoc: dbMod.setDoc, deleteDoc: dbMod.deleteDoc, 
+       collection: dbMod.collection, onSnapshot: dbMod.onSnapshot 
+     };
 
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await authMod.signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await authMod.signInAnonymously(auth);
-      }
-      
-      user = auth.currentUser;
-      dbg("[FB] Verbunden als: " + user.uid.substring(0,6)+"...", true);
-      return true;
-    } catch(e) {
-      dbg("[FB] Offline: " + e.message, true);
-      return false;
-    }
-  }
+     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+       await authMod.signInWithCustomToken(auth, __initial_auth_token);
+     } else {
+       await authMod.signInAnonymously(auth);
+     }
+     
+     user = auth.currentUser;
+     dbg("[FB] Verbunden als: " + user.uid.substring(0,6)+"...", true);
+     return true;
+   } catch(e) {
+     dbg("[FB] Offline: " + e.message, true);
+     return false;
+   }
+ }
 
-  /* ---------- MAP ---------- */
-  const MAP = {
-    walls: [], rooms: [], hoops: [],
-    spawn: { x: 300, y: 250 }
-  };
+ /* ---------- MAP ---------- */
+ const MAP = {
+   walls: [], rooms: [], hoops: [],
+   spawn: { x: 300, y: 250 }
+ };
 
-  function buildMap() {
-    const W = CFG.MAP_W, H = CFG.MAP_H, T = 14;
+ function buildMap() {
+   const W = CFG.MAP_W, H = CFG.MAP_H, T = 14;
 
-    MAP.walls.push({x:0,y:0,w:W,h:T});
-    MAP.walls.push({x:0,y:H-T,w:W,h:T});
-    MAP.walls.push({x:0,y:0,w:T,h:H});
-    MAP.walls.push({x:W-T,y:0,w:T,h:H});
+   MAP.walls.push({x:0,y:0,w:W,h:T});
+   MAP.walls.push({x:0,y:H-T,w:W,h:T});
+   MAP.walls.push({x:0,y:0,w:T,h:H});
+   MAP.walls.push({x:W-T,y:0,w:T,h:H});
 
-    buildRoom(T,    T,  380, 280, "KLASSE 1A", COL.floor, "S", 160);
-    buildRoom(T+380,T,  380, 280, "KLASSE 1B", COL.floor2, "S", 160);
-    buildRoom(T+760,T,  380, 280, "KLASSE 1C", COL.floor, "S", 160);
-    buildRoom(T+1140,T, 380, 280, "BIBLIOTHEK", COL.floor2, "S", 160);
-    buildRoom(T+1520,T, W-T-T-1520, 280, "LEHRER", COL.floor, "S", 200);
+   buildRoom(T,    T,  380, 280, "KLASSE 1A", COL.floor, "S", 160);
+   buildRoom(T+380,T,  380, 280, "KLASSE 1B", COL.floor2, "S", 160);
+   buildRoom(T+760,T,  380, 280, "KLASSE 1C", COL.floor, "S", 160);
+   buildRoom(T+1140,T, 380, 280, "BIBLIOTHEK", COL.floor2, "S", 160);
+   buildRoom(T+1520,T, W-T-T-1520, 280, "LEHRER", COL.floor, "S", 200);
 
-    buildRoom(T, H-T-340, 300, 340, "UMKLEIDE", COL.locker, "N", 130, {lockers:true});
-    buildRoom(T+300, H-T-420, 820, 420, "TURNHALLE", COL.gym, "N", 380, {gym:true});
-    buildRoom(T+1120, H-T-340, 400, 340, "MENSA", COL.floor2, "N", 180, {benches:true});
-    buildRoom(T+1520, H-T-340, W-T-T-1520, 340, "HOF", COL.floor, "N", 180);
+   buildRoom(T, H-T-340, 300, 340, "UMKLEIDE", COL.locker, "N", 130, {lockers:true});
+   buildRoom(T+300, H-T-420, 820, 420, "TURNHALLE", COL.gym, "N", 380, {gym:true});
+   buildRoom(T+1120, H-T-340, 400, 340, "MENSA", COL.floor2, "N", 180, {benches:true});
+   buildRoom(T+1520, H-T-340, W-T-T-1520, 340, "HOF", COL.floor, "N", 180);
 
-    pillar(T+420, 520); pillar(T+1000, 520); pillar(T+1600, 520);
-    pillar(T+560, 860); pillar(T+1200, 860); pillar(T+1760, 860);
+   pillar(T+420, 520); pillar(T+1000, 520); pillar(T+1600, 520);
+   pillar(T+560, 860); pillar(T+1200, 860); pillar(T+1760, 860);
 
-    const gymL = T+300, gymT = H-T-420;
-    MAP.hoops.push({ x: gymL+50,  y: gymT+210, side:"L" });
-    MAP.hoops.push({ x: gymL+770, y: gymT+210, side:"R" });
+   const gymL = T+300, gymT = H-T-420;
+   MAP.hoops.push({ x: gymL+50,  y: gymT+210, side:"L" });
+   MAP.hoops.push({ x: gymL+770, y: gymT+210, side:"R" });
 
-    S.pallets = [
-      {id:0, x:280, y:640, state:0, cd:0},
-      {id:1, x:820, y:640, state:0, cd:0},
-      {id:2, x:1380, y:640, state:0, cd:0},
-      {id:3, x:1820, y:640, state:0, cd:0},
-      {id:4, x:540, y:960, state:0, cd:0},
-      {id:5, x:1220, y:960, state:0, cd:0},
-      {id:6, x:1700, y:960, state:0, cd:0}
-    ];
-  }
+   S.pallets = [
+     {id:0, x:280, y:640, state:0, cd:0},
+     {id:1, x:820, y:640, state:0, cd:0},
+     {id:2, x:1380, y:640, state:0, cd:0},
+     {id:3, x:1820, y:640, state:0, cd:0},
+     {id:4, x:540, y:960, state:0, cd:0},
+     {id:5, x:1220, y:960, state:0, cd:0},
+     {id:6, x:1700, y:960, state:0, cd:0}
+   ];
+ }
 
-  function buildRoom(x, y, w, h, label, color, doorSide, doorOff, opts) {
-    opts = opts || {};
-    const T = 14, door = 80;
-    MAP.rooms.push({ x, y, w, h, label, color });
+ function buildRoom(x, y, w, h, label, color, doorSide, doorOff, opts) {
+   opts = opts || {};
+   const T = 14, door = 80;
+   MAP.rooms.push({ x, y, w, h, label, color });
 
-    if (doorSide === "N") {
-      MAP.walls.push({x, y, w: doorOff, h: T});
-      MAP.walls.push({x: x+doorOff+door, y, w: w-doorOff-door, h: T});
-    } else MAP.walls.push({x, y, w, h: T});
+   if (doorSide === "N") {
+     MAP.walls.push({x, y, w: doorOff, h: T});
+     MAP.walls.push({x: x+doorOff+door, y, w: w-doorOff-door, h: T});
+   } else MAP.walls.push({x, y, w, h: T});
 
-    if (doorSide === "S") {
-      MAP.walls.push({x, y: y+h-T, w: doorOff, h: T});
-      MAP.walls.push({x: x+doorOff+door, y: y+h-T, w: w-doorOff-door, h: T});
-    } else MAP.walls.push({x, y: y+h-T, w, h: T});
+   if (doorSide === "S") {
+     MAP.walls.push({x, y: y+h-T, w: doorOff, h: T});
+     MAP.walls.push({x: x+doorOff+door, y: y+h-T, w: w-doorOff-door, h: T});
+   } else MAP.walls.push({x, y: y+h-T, w, h: T});
 
-    MAP.walls.push({x, y, w: T, h});
-    MAP.walls.push({x: x+w-T, y, w: T, h});
+   MAP.walls.push({x, y, w: T, h});
+   MAP.walls.push({x: x+w-T, y, w: T, h});
 
-    if (opts.lockers) {
-      for (let i = 0; i < 4; i++) MAP.walls.push({x: x+30+i*50, y: y+40, w: 40, h: 44, locker:true});
-    }
-    if (opts.benches) {
-      for (let i = 0; i < 3; i++) MAP.walls.push({x: x+30, y: y+60+i*80, w: w-60, h: 18, bench:true});
-    }
-    if (opts.gym) {
-      MAP.rooms.push({x: x+w/2-2, y: y+T, w: 4, h: h-T*2, color: "rgba(252,238,10,.1)"});
-      MAP.rooms.push({x: x+w/2-50, y: y+h/2-50, w: 100, h: 100, color: "rgba(252,238,10,.06)", circle: true});
-    }
-  }
+   if (opts.lockers) {
+     for (let i = 0; i < 4; i++) MAP.walls.push({x: x+30+i*50, y: y+40, w: 40, h: 44, locker:true});
+   }
+   if (opts.benches) {
+     for (let i = 0; i < 3; i++) MAP.walls.push({x: x+30, y: y+60+i*80, w: w-60, h: 18, bench:true});
+   }
+   if (opts.gym) {
+     MAP.rooms.push({x: x+w/2-2, y: y+T, w: 4, h: h-T*2, color: "rgba(252,238,10,.1)"});
+     MAP.rooms.push({x: x+w/2-50, y: y+h/2-50, w: 100, h: 100, color: "rgba(252,238,10,.06)", circle: true});
+   }
+ }
 
-  function pillar(x, y) { MAP.walls.push({x, y, w: 36, h: 36, pillar: true}); }
-
+ function pillar(x, y) { MAP.walls.push({x, y, w: 36, h: 36, pillar: true}); }
   buildMap();
 
   /* ---------- AUDIO ---------- */
@@ -1498,25 +1514,40 @@ try {
     const touch = ("ontouchstart" in window) || window.innerWidth < 900;
     if (!touch) return;
     if (!S.running) return;
+    
     ctx.save();
     ctx.strokeStyle = "rgba(243,243,255,0.3)";
     ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(IN.joy.bx, IN.joy.by, IN.joy.r, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); 
+    ctx.arc(IN.joy.bx, IN.joy.by, IN.joy.r, 0, Math.PI * 2); 
+    ctx.stroke();
+    
     ctx.fillStyle = "rgba(252,238,10,0.5)";
-    ctx.beginPath(); ctx.arc(IN.joy.nx, IN.joy.ny, 20, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); 
+    ctx.arc(IN.joy.nx, IN.joy.ny, 20, 0, Math.PI * 2); 
+    ctx.fill();
+    ctx.strokeStyle = COL.ink; 
+    ctx.lineWidth = 2; 
+    ctx.stroke();
+    
     drawBtn(IN.btnA, "A", COL.danger);
     drawBtn(IN.btnB, "B", COL.cool);
     drawBtn(IN.btnC, "C", COL.accent);
     ctx.restore();
   }
+  
   function drawBtn(b, lbl, col) {
     ctx.fillStyle = b.active ? col : "rgba(0,0,0,0.5)";
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); 
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); 
+    ctx.fill();
+    ctx.strokeStyle = col; 
+    ctx.lineWidth = 2; 
+    ctx.stroke();
     ctx.fillStyle = b.active ? "#000" : COL.ink;
     ctx.font = "bold 16px monospace";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.textAlign = "center"; 
+    ctx.textBaseline = "middle";
     ctx.fillText(lbl, b.x, b.y);
   }
 
