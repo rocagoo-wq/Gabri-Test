@@ -311,12 +311,12 @@
         let serverPlayers = {}; 
         let gameEntities = {};  
         let gameState = { 
-            isPlaying: false, timeLeft: 0, currentGabri: null, hostId: null, roundId: null, tagCounter: 0,
+            isPlaying: false, endTime: 0, currentGabri: null, hostId: null, roundId: null, tagCounter: 0,
             ball_x: 2200, ball_y: 1500, ball_vx: 0, ball_vy: 0, ball_owner: null, ball_ts: 0,
             boss_active: false, boss_hp: 500, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
             sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null,
             mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null,
-            dead_npcs: {} // Array zum Speichern der getöteten NPCs
+            dead_npcs: {} 
         };
         
         let currentRoundId = null;
@@ -326,9 +326,10 @@
         let lastHostTick = 0;
         let lastStairTime = 0; 
         let lastConfettiTs = 0;
+        let localTimeLeft = 0;
 
         // Lokale Ball-Physik für perfekte Sync
-        let localBall = { active: false, x: 2200, y: 1500, z: 0, vx: 0, vy: 0, vz: 0 };
+        let localBall = { active: true, x: 2200, y: 1500, z: 0, vx: 0, vy: 0, vz: 0 };
         let lastBallTs = 0;
 
         let myLocalPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
@@ -446,7 +447,7 @@
         stairs.push({ x: 1225, y: 1500, w: 150, h: 150, targetY: 3500, label: 'ZUM OG' });
         stairs.push({ x: 1225, y: 3500, w: 150, h: 150, targetY: 1500, label: 'ZUM EG' });
 
-        // --- NPC GENERATOR (100 Personen) ---
+        // --- NPC GENERATOR (100 Personen mit sicheren Routen) ---
         function mulberry32(a) {
             return function() {
               var t = a += 0x6D2B79F5;
@@ -459,25 +460,21 @@
 
         for (let i = 0; i < 100; i++) {
             let type, sx, sy, mx, my, spd;
-            if (i < 5) { // 5 Lehrer
+            if (i < 5) { // 5 Lehrer im Flur
                 type = 'teacher';
-                sx = 1300 + prng() * 400; sy = 800 + prng() * 2000;
-                mx = (prng() - 0.5) * 600; my = (prng() - 0.5) * 600; spd = 0.001;
-            } else if (i < 15) { // 10 Cheerleader in der Turnhalle
+                sx = 1250 + prng() * 150; sy = 200 + prng() * 1600;
+                mx = 0; my = (prng() > 0.5 ? 1 : -1) * (150 + prng() * 200); spd = 0.001;
+            } else if (i < 15) { // 10 Cheerleader IN der Turnhalle (1600-2800, 1300-1800)
                 type = 'cheerleader';
                 sx = 1600 + prng() * 1200; sy = 1300 + prng() * 500;
                 mx = 0; my = 0; spd = 0.005 + prng()*0.002;
-            } else { // 85 Schüler (Hindernisse)
+            } else { // 85 Schüler auf sicheren Flur-Routen (EG und OG Flure)
                 type = 'student';
-                let valid = false;
-                while(!valid) {
-                    sx = 100 + prng() * (MAP_WIDTH - 200);
-                    sy = prng() * (MAP_HEIGHT - 200);
-                    if (sy > 1900 && sy < 2100) continue; // Nicht in der Trennwand spawnen
-                    // Grober Wand Check
-                    valid = !obstacles.some(o => o.isWall && sx < o.x+o.w && sx+40>o.x && sy<o.y+o.h && sy+40>o.y);
-                }
-                mx = (prng() - 0.5) * 400; my = (prng() - 0.5) * 400; spd = 0.0005 + prng() * 0.001;
+                let inOG = prng() > 0.5;
+                sx = 1150 + prng() * 200; 
+                sy = (inOG ? 2100 : 100) + prng() * 1700;
+                // Schüler laufen auf und ab
+                mx = 0; my = (prng() > 0.5 ? 1 : -1) * (50 + prng() * 150); spd = 0.001 + prng() * 0.001;
             }
             npcs.push({ id: i, startX: sx, startY: sy, moveX: mx, moveY: my, speed: spd, type: type, currentX: sx, currentY: sy });
         }
@@ -493,7 +490,7 @@
             else if (type === 'teacher') { skin = '#eebb99'; shirt = '#555555'; hair = '#cccccc'; }
             else if (type === 'boss') { skin = '#ff4444'; shirt = '#220000'; pants = '#110000'; hair = '#ffaa00'; }
             else if (type === 'cheerleader') { skin = '#ffcba4'; shirt = '#ff66b2'; pants = '#ffffff'; hair = '#ffee66'; }
-            else if (type === 'student') { shirt = '#3366ff'; pants = '#444444'; hair = '#5c3a21'; } // Standard Schüler
+            else if (type === 'student') { shirt = '#3366ff'; pants = '#444444'; hair = '#5c3a21'; } 
 
             let layout = [
                 [0,0,0,0,6,6,6,6,0,0,0,0], [0,0,0,6,2,2,2,2,6,0,0,0], [0,0,6,2,0,2,2,0,2,6,0,0],
@@ -503,7 +500,6 @@
             ];
 
             if (type === 'cheerleader') {
-                // Pom-Poms in den Händen
                 layout[5][0] = 3; layout[5][11] = 3; layout[6][0] = 3; layout[6][11] = 3;
             }
 
@@ -622,7 +618,6 @@
                         localGabriSince = Date.now();
                     }
                     
-                    // Knockback Check für Laser-Treffer
                     if (newState[`knockback_${user.uid}`]) {
                         const kb = newState[`knockback_${user.uid}`];
                         if (kb.ts !== lastKnockbackTs) {
@@ -632,18 +627,21 @@
                         }
                     }
 
-                    // Item Sync Check
                     if (myHeldItem === 'ball' && newState.ball_owner !== user.uid) myHeldItem = null;
                     if (myHeldItem === 'mg' && newState.mg_owner !== user.uid) myHeldItem = null;
                     if (myHeldItem && myHeldItem.startsWith('sword') && newState[myHeldItem+'_owner'] !== user.uid) myHeldItem = null;
 
-                    // Ball Physics Start Check
                     if (newState.ball_ts !== lastBallTs) {
                         lastBallTs = newState.ball_ts;
                         localBall.active = true;
                         localBall.x = newState.ball_x; localBall.y = newState.ball_y;
                         localBall.vx = newState.ball_vx || 0; localBall.vy = newState.ball_vy || 0;
-                        localBall.z = 40; localBall.vz = 350; // Wurfstärke nach oben
+                        localBall.z = 40; localBall.vz = 350; 
+                    } else if (newState.ball_owner == null && !localBall.active) {
+                        // Initiale Platzierung, wenn er nur rumliegt
+                        localBall.active = true;
+                        localBall.x = newState.ball_x; localBall.y = newState.ball_y;
+                        localBall.z = 0; localBall.vx = 0; localBall.vy = 0;
                     }
 
                     gameState = newState;
@@ -673,12 +671,12 @@
                     currentGabri: randomGabri,
                     tagCounter: 0,
                     hostId: user.uid,
-                    timeLeft: GAME_DURATION_SEC,
+                    endTime: Date.now() + GAME_DURATION_SEC * 1000, // Uhrzeit-Sicheres System
                     ball_x: 2200, ball_y: 1500, ball_vx: 0, ball_vy: 0, ball_owner: null, ball_ts: 0,
                     boss_active: false, boss_hp: 500, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
                     sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null,
                     mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null,
-                    dead_npcs: {} // Array zum Speichern der getöteten NPCs (Laser/Schwert)
+                    dead_npcs: {} 
                 });
 
                 for(let id of activeIds) {
@@ -697,7 +695,7 @@
         });
 
         function handleStateChange() {
-            if (gameState.isPlaying && gameState.timeLeft > 0) {
+            if (gameState.isPlaying && localTimeLeft > 0) {
                 screensLayer.style.display = 'none';
                 uiLayer.style.display = 'flex';
                 document.body.classList.add('game-running'); 
@@ -710,7 +708,7 @@
                     const gName = serverPlayers[localCurrentGabri]?.name || "Jemand";
                     document.getElementById('roleDisplay').innerHTML = `<span style="color:var(--primary)">LAUF! ${gName} ist Gabri!</span>`;
                 }
-            } else if (gameState.isPlaying && gameState.timeLeft <= 0) {
+            } else if (gameState.isPlaying && localTimeLeft <= 0) {
                 if (screensLayer.style.display === 'none') showLeaderboard();
                 document.body.classList.remove('game-running');
             } else {
@@ -741,7 +739,7 @@
             const p = serverPlayers[playerId];
             if (!p) return 0;
             let total = p.timeAsGabri || 0;
-            if (gameState.isPlaying && gameState.timeLeft > 0 && localCurrentGabri === playerId) {
+            if (gameState.isPlaying && localTimeLeft > 0 && localCurrentGabri === playerId) {
                 total += (Date.now() - localGabriSince);
             }
             return total;
@@ -886,12 +884,13 @@
         function doActionA() {
             if (!gameState.isPlaying || !currentRoomId) return;
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            const myPlayerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+            
             const cx = myLocalPlayer.x + PLAYER_SIZE/2;
             const cy = myLocalPlayer.y + PLAYER_SIZE/2;
             const isGabri = (localCurrentGabri === user.uid);
             const now = Date.now();
             
-            // PRIO 1: PALLETS (DbD Style)
             let nearestPallet = null; let minDistP = 120;
             for (let p of mapPallets) {
                 let pcx = p.dropRect.x + p.dropRect.w/2; let pcy = p.dropRect.y + p.dropRect.h/2;
@@ -928,9 +927,7 @@
                 }
             }
 
-            // PRIO 2: ITEMS BENUTZEN
             if (myHeldItem === 'ball') {
-                // Ball werfen mit Velocity
                 myHeldItem = null;
                 updateDoc(roomRef, {
                     'ball_owner': null, 
@@ -940,25 +937,21 @@
                 });
                 return;
             } else if (myHeldItem === 'mg') {
-                // MG Schießen (Hitscan Laser + Knockback)
-                if (now - lastMgShot < 150) return; // Feuerrate
+                if (now - lastMgShot < 150) return; 
                 lastMgShot = now;
                 
                 let hitTarget = null;
                 let lx = cx; let ly = cy;
                 
-                // Raycast in Blickrichtung
                 for(let i=0; i<20; i++) {
                     lx += myFacing.x * 40; ly += myFacing.y * 40;
-                    if (checkWall(lx, ly)) break; // Wand getroffen
+                    if (checkWall(lx, ly)) break; 
                     
-                    // Boss getroffen?
                     if (gameState.boss_active && gameState.boss_hp > 0 && cy > 2000) {
                         if (Math.hypot(lx - (gameState.boss_x+60), ly - (gameState.boss_y+60)) < 70) {
                             hitTarget = 'boss'; break;
                         }
                     }
-                    // NPC getroffen?
                     for(let npc of npcs) {
                         if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue;
                         let sameFloor = (cy > 2000 && npc.currentY > 2000) || (cy < 2000 && npc.currentY < 2000);
@@ -966,7 +959,6 @@
                             hitTarget = 'npc_' + npc.id; break;
                         }
                     }
-                    // Spieler getroffen?
                     for(let id in serverPlayers) {
                         if (id === user.uid) continue;
                         let p = serverPlayers[id];
@@ -981,49 +973,50 @@
                 let updates = { last_laser: { x1: cx, y1: cy, x2: lx, y2: ly, ts: now } };
                 if (hitTarget) {
                     if (hitTarget === 'boss') {
-                        updates.boss_hp = increment(-50); // MG zerschreddert Boss
+                        updates.boss_hp = increment(-50); 
                     } else if (hitTarget.startsWith('npc_')) {
                         let npcId = hitTarget.split('_')[1];
                         updates['dead_npcs.' + npcId] = true;
                     } else {
-                        // Spieler extrem stark wegstoßen
                         updates[`knockback_${hitTarget}`] = { vx: myFacing.x * 1800, vy: myFacing.y * 1800, ts: now };
                     }
                 }
+                
+                // Sende auch eine "Action" Notification über den Spieler (für die Waffen-Animation der Mitspieler)
+                updateDoc(myPlayerRef, { action_ts: now, action_type: 'shoot' });
                 updateDoc(roomRef, updates);
                 return;
 
             } else if (myHeldItem && myHeldItem.startsWith('sword')) {
-                lastSwordAttack = now; // Starte Schweranimation lokal
+                lastSwordAttack = now; 
                 swordStartAngle = Math.atan2(myFacing.y, myFacing.x) - Math.PI/2;
                 createParticles(cx + myFacing.x*30, cy + myFacing.y*30, '#ffffff'); 
                 
                 let updates = {};
 
-                // Hit Boss
                 if (gameState.boss_active && gameState.boss_hp > 0) {
                     const distToBoss = Math.hypot(cx - (gameState.boss_x + 60), cy - (gameState.boss_y + 60));
                     if (distToBoss < 150) {
-                        updates.boss_hp = increment(-50); // 50 Damage pro Schlag
+                        updates.boss_hp = increment(-50); 
                         createParticles(gameState.boss_x + 60, gameState.boss_y + 60, '#ffcc00'); 
                     }
                 }
 
-                // Hit NPCs
                 for(let npc of npcs) {
                     if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue;
                     let sameFloor = (cy > 2000 && npc.currentY > 2000) || (cy < 2000 && npc.currentY < 2000);
-                    // Schwert Reichweite
                     if (sameFloor && Math.hypot(cx + myFacing.x*50 - (npc.currentX+20), cy + myFacing.y*50 - (npc.currentY+20)) < 60) {
                         updates['dead_npcs.' + npc.id] = true;
                         createParticles(npc.currentX + 20, npc.currentY + 20, '#ff0000');
                     }
                 }
+                
+                // Synchronisiere den Schwertschwung für Mitspieler
+                updateDoc(myPlayerRef, { action_ts: now, action_type: 'sword', action_angle: swordStartAngle });
                 if (Object.keys(updates).length > 0) updateDoc(roomRef, updates);
                 return;
             }
 
-            // PRIO 3: ITEMS AUFHEBEN
             if (!gameState.ball_owner && Math.hypot(cx - gameState.ball_x, cy - gameState.ball_y) < 100) {
                 myHeldItem = 'ball'; updateDoc(roomRef, { 'ball_owner': user.uid }); return;
             }
@@ -1057,10 +1050,6 @@
                 if (gameState['pallet_'+p.id] === 1) { 
                     if (nx < p.dropRect.x + p.dropRect.w && nx + PLAYER_SIZE > p.dropRect.x && ny < p.dropRect.y + p.dropRect.h && ny + PLAYER_SIZE > p.dropRect.y) return true;
                 }
-            }
-            for (let npc of npcs) {
-                if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue;
-                if (nx < npc.currentX + PLAYER_SIZE && nx + PLAYER_SIZE > npc.currentX && ny < npc.currentY + PLAYER_SIZE && ny + PLAYER_SIZE > npc.currentY) return true;
             }
             return false;
         }
@@ -1115,16 +1104,19 @@
             const now = Date.now();
 
             if (user) {
-                if (gameState.isPlaying && gameState.hostId === user.uid && gameState.timeLeft > 0) {
-                    if (now - lastHostTick > 1000) {
+                
+                // HOST LOGIC (Timer, Boss)
+                if (gameState.isPlaying && gameState.endTime > 0) {
+                    localTimeLeft = Math.max(0, Math.floor((gameState.endTime - now) / 1000));
+                    
+                    if (gameState.hostId === user.uid && now - lastHostTick > 1000) {
                         lastHostTick = now;
-                        let updates = { timeLeft: gameState.timeLeft - 1 };
+                        let updates = {};
                         
-                        if (updates.timeLeft <= 60 && !gameState.boss_active && gameState.boss_hp > 0 && !gameState.mg_dropped) {
+                        if (localTimeLeft <= 60 && !gameState.boss_active && gameState.boss_hp > 0 && !gameState.mg_dropped) {
                             updates.boss_active = true;
                         }
                         
-                        // Boss Defeat Drop
                         if (gameState.boss_active && gameState.boss_hp <= 0 && !gameState.mg_dropped) {
                             updates.boss_active = false;
                             updates.mg_dropped = true;
@@ -1148,12 +1140,14 @@
                                 updates.boss_x = updates.boss_tx; 
                             }
                         }
-                        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-                        updateDoc(roomRef, updates).catch(()=>{});
+                        if (Object.keys(updates).length > 0) {
+                            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+                            updateDoc(roomRef, updates).catch(()=>{});
+                        }
                     }
                 }
 
-                if (gameState.isPlaying && gameState.timeLeft > 0 && screensLayer.style.display === 'none') {
+                if (gameState.isPlaying && localTimeLeft > 0 && screensLayer.style.display === 'none') {
                     
                     const move = getMovementVector();
                     
@@ -1161,7 +1155,7 @@
 
                     let mx = (move.dx * BASE_SPEED * dashSpeedMult + kb_vx) * dt;
                     let my = (move.dy * BASE_SPEED * dashSpeedMult + kb_vy) * dt;
-                    kb_vx *= 0.85; kb_vy *= 0.85; // Knockback Friction
+                    kb_vx *= 0.85; kb_vy *= 0.85; 
 
                     if (Math.abs(move.dx) > 0.1 || Math.abs(move.dy) > 0.1) {
                         const len = Math.hypot(move.dx, move.dy);
@@ -1181,7 +1175,7 @@
                         }
                     }
 
-                    // LOKALE BALL PHYSIK (Smooth & Bouncy)
+                    // LOKALE BALL PHYSIK
                     if (!gameState.ball_owner && localBall.active) {
                         let bnx = localBall.x + localBall.vx * dt;
                         let bny = localBall.y + localBall.vy * dt;
@@ -1191,16 +1185,15 @@
                         if (hitX) localBall.vx *= -0.7; else localBall.x = bnx;
                         if (hitY) localBall.vy *= -0.7; else localBall.y = bny;
                         
-                        localBall.vx *= 0.98; localBall.vy *= 0.98; // Friction
-                        
-                        localBall.vz -= 800 * dt; // Gravity
+                        localBall.vx *= 0.98; localBall.vy *= 0.98; 
+                        localBall.vz -= 800 * dt; 
                         localBall.z += localBall.vz * dt;
+                        
                         if (localBall.z < 0) {
                             localBall.z = 0;
                             if (localBall.vz < -50) localBall.vz *= -0.6; else { localBall.vz = 0; localBall.vx *= 0.9; localBall.vy *= 0.9; }
                         }
 
-                        // Korb Check
                         if (localBall.z > 80 && Math.hypot(localBall.x - (hoop.x + hoop.w/2), localBall.y - (hoop.y + 10)) < 40) {
                             if (now - lastConfettiTs > 1000) {
                                 spawnConfetti(hoop.x + hoop.w/2, hoop.y + 10);
@@ -1234,8 +1227,8 @@
 
                     checkTags();
 
-                    const min = Math.floor(gameState.timeLeft / 60);
-                    const sec = gameState.timeLeft % 60;
+                    const min = Math.floor(localTimeLeft / 60);
+                    const sec = localTimeLeft % 60;
                     document.getElementById('timerDisplay').innerText = `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
                     document.getElementById('myTimeDisplay').innerText = `Zeit als Gabri: ${(getTotalGabriTime(user.uid)/1000).toFixed(1)}s`;
                     floorDisplay.innerText = myLocalPlayer.y > 2000 ? "OBERGESCHOSS (OG)" : "ERDGESCHOSS (EG)";
@@ -1247,7 +1240,6 @@
         }
 
         function render(dt, nowTime) {
-            // NPCs Update
             npcs.forEach(npc => {
                 const offset = Math.sin(nowTime * npc.speed);
                 npc.currentX = npc.startX + npc.moveX * offset;
@@ -1324,9 +1316,8 @@
                 ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.font = 'bold 36px "Outfit"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(l.text, l.x, l.y);
             }
 
-            // NPCs (Schüler & Lehrer & Cheerleader)
             for(let npc of npcs) {
-                if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue; // Überspringen wenn tot
+                if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue; 
                 if ((isInOG && npc.currentY < 2000) || (!isInOG && npc.currentY > 2000)) continue;
 
                 ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; ctx.imageSmoothingEnabled = false;
@@ -1351,7 +1342,6 @@
                 }
             }
 
-            // MG Drop Rendern
             if (isInOG && gameState.mg_dropped && !gameState.mg_owner) {
                 ctx.fillStyle = '#444'; ctx.fillRect(gameState.mg_x - 15, gameState.mg_y, 30, 8); 
                 ctx.fillStyle = '#222'; ctx.fillRect(gameState.mg_x - 5, gameState.mg_y + 8, 10, 10); 
@@ -1369,7 +1359,7 @@
                 let bFrame = Math.floor(nowTime / 250) % 2;
                 ctx.drawImage(texBoss[bFrame], bx, by, 120, 120); 
                 
-                if (gameState.timeLeft > 55) {
+                if (localTimeLeft > 55) {
                     ctx.fillStyle = 'rgba(255,0,0,0.5)';
                     ctx.font = 'bold 60px "Press Start 2P"'; ctx.textAlign = 'center';
                     ctx.fillText("ISHIN IST ERWACHT!", camera.x + canvas.width/2, camera.y + 200);
@@ -1381,7 +1371,6 @@
                 ctx.fillText("ISHIN", bx + 60, by - 30);
             }
 
-            // Laser Strahl Rendern
             if (gameState.last_laser && nowTime - gameState.last_laser.ts < 150) {
                 ctx.strokeStyle = 'rgba(255, 51, 102, 0.8)'; 
                 ctx.lineWidth = 6;
@@ -1392,7 +1381,6 @@
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); 
             }
 
-            // Ball Rendern 
             let drawBallX = localBall.x; let drawBallY = localBall.y; let drawBallZ = localBall.z;
             if (gameState.ball_owner) {
                 const owner = serverPlayers[gameState.ball_owner] || (gameState.ball_owner === user.uid ? myLocalPlayer : null);
@@ -1442,18 +1430,22 @@
                 }
                 
                 if (playerHeldItem && playerHeldItem.startsWith('sword')) {
-                    // Schwert Animation Zeichnen
-                    if (isMe && nowTime - lastSwordAttack < 200) {
-                        let prog = (nowTime - lastSwordAttack) / 200;
+                    // MULTIPLAYER SWORD ANIMATION
+                    let swingTs = isMe ? lastSwordAttack : sp.action_ts;
+                    let isSwinging = (sp.action_type === 'sword' || isMe) && (nowTime - swingTs < 200);
+
+                    if (isSwinging) {
+                        let prog = (nowTime - swingTs) / 200;
+                        let angle = isMe ? swordStartAngle : sp.action_angle;
                         ctx.save();
                         ctx.translate(px + 20, py + 20);
-                        ctx.rotate(swordStartAngle + (prog * Math.PI)); 
+                        ctx.rotate(angle + (prog * Math.PI)); 
                         ctx.fillStyle = '#aaaaaa'; ctx.fillRect(15, -3, 30, 6);
                         ctx.fillStyle = '#ffcc00'; ctx.fillRect(10, -9, 6, 18);
                         ctx.restore();
                     } else {
                         ctx.fillStyle = '#aaaaaa'; ctx.fillRect(px + 35, py - 5, 6, 30);
-                        ctx.fillStyle = '#ffcc00'; ctx.fillRect(px + 31, py + 20, 14, 6); // Guard
+                        ctx.fillStyle = '#ffcc00'; ctx.fillRect(px + 31, py + 20, 14, 6); 
                     }
                 } else if (playerHeldItem === 'mg') {
                     ctx.fillStyle = '#444'; ctx.fillRect(px + 10, py + 15, 30, 6);
@@ -1482,7 +1474,7 @@
             ctx.beginPath(); ctx.arc(joystick.nx, joystick.ny, 25, 0, Math.PI*2);
             ctx.fillStyle = 'rgba(0, 255, 204, 0.4)'; ctx.shadowColor = '#00ffcc'; ctx.shadowBlur = 15; ctx.fill();
             
-            // A Button
+            // A Button (Aktion)
             ctx.beginPath(); ctx.arc(btnA.x, btnA.y, btnA.r, 0, Math.PI*2);
             ctx.fillStyle = btnA.active ? 'rgba(255,51,102,0.6)' : 'rgba(255,51,102,0.2)'; 
             ctx.strokeStyle = 'rgba(255,51,102,0.4)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
@@ -1490,7 +1482,7 @@
             ctx.fillText("A", btnA.x, btnA.y-8);
             ctx.font = '10px "Outfit"'; ctx.fillText("(SPACE)", btnA.x, btnA.y+8);
 
-            // B Button
+            // B Button (Dash)
             ctx.beginPath(); ctx.arc(btnB.x, btnB.y, btnB.r, 0, Math.PI*2);
             ctx.fillStyle = btnB.active ? 'rgba(0,255,204,0.6)' : 'rgba(0,255,204,0.2)'; 
             ctx.strokeStyle = 'rgba(0,255,204,0.4)'; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
