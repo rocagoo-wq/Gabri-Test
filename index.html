@@ -414,9 +414,9 @@
                 </span>
             </p>
             
-            <!-- NEU: Server Status UI -->
-            <div id="serverStatus" class="text-xs text-yellow-400 text-center mb-3 font-bold bg-black p-2 rounded border border-yellow-900">
-                📡 Verbinde zum Spielserver...
+            <!-- SERVER STATUS UI (CRITICAL FIX) -->
+            <div id="serverStatus" class="text-xs text-yellow-400 text-center mb-3 font-bold bg-gray-900 p-2 rounded border border-yellow-900">
+                📡 INITIIERE VERBINDUNG...
             </div>
 
             <input type="text" id="playerNameInput" class="input-elite" placeholder="DEIN NAME" maxlength="12" autocomplete="off">
@@ -489,7 +489,9 @@
         // ----------------------------------------------------------------------
         // 1. FIREBASE CONFIGURATION (ENTERPRISE STANDARD)
         // ----------------------------------------------------------------------
+        // BUGFIX: Unity of variable naming to prevent ReferenceError crash!
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-2026-core';
+        
         const FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyDWM2Dnq72MeWuZcV3uT4YXg0G9nyZIVAc", 
             authDomain: "gabri-4f94c.firebaseapp.com",
@@ -670,6 +672,13 @@
                                 </span>
                             </div>
                         </div>`;
+                }
+            },
+            setStatus: (msg, colorClass) => {
+                const el = document.getElementById('serverStatus');
+                if (el) {
+                    el.innerText = msg;
+                    el.className = "text-xs text-center mb-3 font-bold bg-gray-900 p-2 rounded border " + colorClass;
                 }
             }
         };
@@ -1352,7 +1361,7 @@
         // ============================================================================
         let isAuthReady = false;
 
-        // Auto-Initialize Auth in background to avoid click-stuck bugs
+        // Auto-Initialize Auth in background
         async function performAutoAuth() {
             try {
                 if (!auth.currentUser) {
@@ -1368,11 +1377,7 @@
                         currentUser = user;
                         isAuthReady = true;
                         
-                        const statusEl = document.getElementById('serverStatus');
-                        if(statusEl) {
-                            statusEl.innerText = "SERVER ONLINE 🟢";
-                            statusEl.className = "text-xs text-green-400 text-center mb-3 font-bold bg-black p-2 rounded border border-green-900";
-                        }
+                        UIManager.setStatus("🟢 SERVER ONLINE - BEREIT", "text-green-400 border-green-900");
                         
                         const btn = document.getElementById('btnJoin');
                         if (btn) {
@@ -1383,12 +1388,8 @@
                 });
             } catch (e) {
                 console.error("Auth Init Failed:", e);
-                const statusEl = document.getElementById('serverStatus');
-                if(statusEl) {
-                    statusEl.innerText = "SERVER OFFLINE 🔴";
-                    statusEl.className = "text-xs text-red-400 text-center mb-3 font-bold bg-black p-2 rounded border border-red-900";
-                }
-                alert("Verbindungsfehler zur Spieldatenbank. Überprüfe die Firebase Konfiguration.");
+                UIManager.setStatus("🔴 OFFLINE: " + e.code, "text-red-400 border-red-900");
+                alert("Verbindungsfehler zur Datenbank. Überprüfe die Firebase Konfiguration.");
             }
         }
         
@@ -1397,21 +1398,15 @@
 
         document.getElementById('btnJoin').addEventListener('click', () => {
             const name = document.getElementById('playerNameInput').value.trim();
-            if (!name) {
-                alert("Bitte gib einen Namen ein!");
-                return; 
-            }
-            if (!isAuthReady || !currentUser) {
-                alert("Warte auf Serververbindung...");
-                return;
-            }
+            if (!name) { alert("Bitte gib einen Namen ein!"); return; }
+            if (!isAuthReady || !currentUser) { alert("Warte auf Serververbindung..."); return; }
             
             myName = name.substring(0, 12);
             sfx.enable(); 
             UIManager.switchScreen('screen-room');
             
             // LOBBY COUNTER
-            if (!globalRoomUnsubscribe) {
+            if (!playersUnsubscribe) {
                 onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'players'), (snapshot) => {
                     const counts = {"GABRI RAUM": 0, "RAUM DES GABRIS": 0, "GABRILOGIE": 0, "GABRIELS": 0};
                     const now = Date.now();
