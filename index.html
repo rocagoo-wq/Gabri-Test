@@ -140,7 +140,7 @@
 <div id="menu">
   <!-- MAIN MENU -->
   <div class="box" id="mainMenu">
-    <span class="tag">v3.1 / MULTIPLAYER EDITION</span>
+    <span class="tag">v3.1 / GABRI-FLUCHT</span>
     <h1>GABRI<br>FLUCHT<span class="sub">· EINER IST ES ·</span></h1>
     <div class="hint">
       Einer ist der GABRI und muss die anderen berühren.<br>
@@ -156,9 +156,7 @@
     <input id="nameIn" type="text" placeholder="DEIN NAME" maxlength="10">
     <select id="modeIn">
       <option value="solo">MODUS: SOLO vs BOTS</option>
-      <option value="alpha">MULTIPLAYER: RAUM ALPHA</option>
-      <option value="beta">MULTIPLAYER: RAUM BETA</option>
-      <option value="gamma">MULTIPLAYER: RAUM GAMMA</option>
+      <option value="multi">MODUS: MULTIPLAYER (PvP)</option>
     </select>
     <button id="btnGo">EINSTEIGEN</button>
   </div>
@@ -382,14 +380,29 @@ try {
       const now = Date.now(); let pList = [];
       snap.forEach(doc => { const d = doc.data(); if (d.roomId === S.roomId && now - d.lastSeen < 12000) pList.push(d); });
       
-      const humans = pList.filter(p => !p.isBot);
-      humans.sort((a,b) => a.id.localeCompare(b.id));
+      // Für reinen Multiplayer sortieren wir nach ältester ID und schließen Bots völlig aus der Host-Berechnung aus
+      pList.sort((a,b) => a.id.localeCompare(b.id));
       const wasHost = S.isHost;
-      S.isHost = (humans.length > 0 && humans[0].id === S.myId);
+      S.isHost = (pList.length > 0 && pList[0].id === S.myId);
 
       const btnStart = document.getElementById("btnStartMp"), btnWait = document.getElementById("btnWaitMp"), btnAgain = document.getElementById("btnAgain"), btnWaitEnd = document.getElementById("btnWaitEnd");
-      if (btnStart) btnStart.style.display = S.isHost ? "block" : "none";
-      if (btnWait) btnWait.style.display = S.isHost ? "none" : "block";
+      
+      if (btnStart) {
+        btnStart.style.display = S.isHost ? "block" : "none";
+        if (S.isHost) {
+          if (pList.length >= 2) {
+            btnStart.disabled = false;
+            btnStart.textContent = "SPIEL STARTEN";
+          } else {
+            btnStart.disabled = true;
+            btnStart.textContent = "WARTE AUF SPIELER...";
+          }
+        }
+      }
+      if (btnWait) {
+        btnWait.style.display = S.isHost ? "none" : "block";
+        btnWait.textContent = "WARTE AUF HOST...";
+      }
       if (btnAgain) btnAgain.style.display = S.isHost ? "inline-block" : "none";
       if (btnWaitEnd) btnWaitEnd.style.display = S.isHost ? "none" : "inline-block";
 
@@ -401,7 +414,7 @@ try {
 
       for (let i = 0; i < pList.length; i++) {
         const remote = pList[i]; if (remote.id === S.myId) continue;
-        let p = findPlayer(remote.id); if (!p) p = makePlayer(remote.id, remote.name, {isBot: remote.isBot, col: remote.col || getColorForId(remote.id)});
+        let p = findPlayer(remote.id); if (!p) p = makePlayer(remote.id, remote.name, {isBot: false, col: remote.col || getColorForId(remote.id)});
         p.targetX = remote.x; p.targetY = remote.y; p.facing = remote.facing || {x:1, y:0}; p.stealth = remote.stealth; p.timeAsGabri = remote.timeAsGabri || 0; p.held = remote.held; p.dashT = remote.dashT || 0;
         newPlayers.push(p);
       }
@@ -411,8 +424,8 @@ try {
       if (listDiv) {
         let html = "";
         for (let i = 0; i < pList.length; i++) {
-          const p = pList[i], isM = (p.id === S.myId), isH = (humans.length > 0 && p.id === humans[0].id);
-          html += '<div class="prow"><span style="color:' + (p.col||COL.cool) + '">' + p.name + (isM?" (DU)":"") + (isH?" <span class='host'>★ HOST</span>":"") + '</span><span style="color:#6d6d8a">' + (p.isBot?"BOT":"ONLINE") + '</span></div>';
+          const p = pList[i], isM = (p.id === S.myId), isH = (pList.length > 0 && p.id === pList[0].id);
+          html += '<div class="prow"><span style="color:' + (p.col||COL.cool) + '">' + p.name + (isM?" (DU)":"") + (isH?" <span class='host'>★ HOST</span>":"") + '</span><span style="color:#6d6d8a">ONLINE</span></div>';
         }
         listDiv.innerHTML = html;
       }
@@ -436,7 +449,7 @@ try {
     S.unsubs.push(unsubPlayers, unsubRoom);
     if (S.syncInt) clearInterval(S.syncInt);
     S.syncInt = setInterval(syncLocalState, 100);
-    document.getElementById("lobbyTag").textContent = "ONLINE · RAUM " + roomId.toUpperCase();
+    document.getElementById("lobbyTag").textContent = "MULTIPLAYER LOBBY";
     showMenu("lobby");
   }
 
@@ -455,14 +468,8 @@ try {
         boss: S.boss ? {x: Math.round(S.boss.x), y: Math.round(S.boss.y), hp: S.boss.hp, active: S.boss.active} : null,
         mg: S.mg ? {x: Math.round(S.mg.x), y: Math.round(S.mg.y), owner: S.mg.owner} : null
       }, {merge: true}).catch(e => {});
-
-      for (let i = 0; i < S.players.length; i++) {
-        const p = S.players[i];
-        if (p.isBot) {
-           const bRef = fb.doc(db, 'artifacts', appId, 'public', 'data', 'gabri_players', p.id);
-           fb.setDoc(bRef, { roomId: S.roomId, id: p.id, name: p.name, isBot: true, col: p.col, x: Math.round(p.x), y: Math.round(p.y), facing: p.facing, stealth: p.stealth, timeAsGabri: p.timeAsGabri, dashT: p.dashT, lastSeen: Date.now() }, {merge: true}).catch(e => {});
-        }
-      }
+      
+      // Im reinen Multiplayer-Modus syncen wir keine Bots mehr zum Server.
     }
   }
 
@@ -550,7 +557,6 @@ try {
 
     const me = findPlayer(S.myId);
     if (me) {
-      // FIX: Dash-T und Cooldowns verringern sich nun korrekt! 
       if (me.dashT > 0) me.dashT -= dt;
       if (me.dashCd > 0) me.dashCd -= dt;
       if (me.tagCd > 0) me.tagCd -= dt;
@@ -568,7 +574,6 @@ try {
       me.stealth = me.stillT > CFG.STEALTH_T;
 
       let sp = CFG.SPEED;
-      // Dash speed wird nur angewendet, solange dashT > 0 ist.
       if (me.dashT > 0) sp *= CFG.DASH_MULT;
 
       let mx = me.inDx * sp + me.kbvx;
@@ -738,7 +743,7 @@ try {
     }
 
     ctx.restore();
-    drawControls(); // Aufruf wiederhergestellt
+    drawControls();
   }
 
   function drawPlayer(p) {
@@ -880,7 +885,12 @@ try {
       listDiv.innerHTML = html;
     }
 
-    document.getElementById("btnStartMp").style.display = "block"; document.getElementById("btnWaitMp").style.display = "none";
+    const btnStart = document.getElementById("btnStartMp");
+    btnStart.style.display = "block";
+    btnStart.disabled = false;
+    btnStart.textContent = "SPIEL STARTEN";
+    document.getElementById("btnWaitMp").style.display = "none";
+    
     showMenu("lobby");
     dbg("[GAME] Solo Setup Ready", true);
   }
@@ -960,9 +970,10 @@ try {
         S.ball = { x: MAP.hoops[0].x + 80, y: MAP.hoops[0].y + 40, vx: 0, vy: 0, z: 0, vz: 0, owner: null, active: true, scoring: false };
         S.boss = null; S.mg = null; S.swords = []; S.particles = []; S.laser = null; S.timeLeft = CFG.ROUND_S; S.cheerDance = 999;
         for (let i = 0; i < S.pallets.length; i++) { S.pallets[i].state = 0; S.pallets[i].cd = 0; }
-        await joinRoom(mode);
+        await joinRoom("global"); // Always use one global room for "Multiplayer"
       } else {
-        startSolo(); // fallback if network fails
+        const b = document.getElementById("banner"); 
+        if (b) { b.textContent = "NETZWERK FEHLER!"; b.classList.add("on"); setTimeout(function() { b.classList.remove("on"); }, 2000); }
       }
       btnGo.disabled = false; btnGo.textContent = "EINSTEIGEN";
     }
@@ -975,25 +986,12 @@ try {
       const g = findPlayer(S.gabriId);
       if (g) banner((g.id === S.myId ? "DU" : g.name) + " IST GABRI! FLIEH!", 2500);
     } else if (S.isHost) {
+      // Host tries to start multiplayer
+      if (S.players.length < 2) return; // Prevent starting with < 2 real players
+
       const ids = [];
-      
-      // NEU: Host generiert die Bots jetzt einmalig für den gesamten Server, wenn noch nicht geschehen!
-      let hasBots = false;
       for (let i = 0; i < S.players.length; i++) {
-          if (S.players[i].isBot) hasBots = true;
           ids.push(S.players[i].id);
-      }
-      
-      if (!hasBots) {
-          for (let i = 0; i < CFG.NUM_BOTS; i++) {
-             const botId = "bot_" + i;
-             S.players.push(makePlayer(botId, BOT_NAMES[i % BOT_NAMES.length], {
-                isBot: true, col: BOT_COLS[i % BOT_COLS.length],
-                x: MAP.spawn.x + Math.random() * 350 - 175,
-                y: MAP.spawn.y + Math.random() * 350 - 175
-             }));
-             ids.push(botId);
-          }
       }
 
       S.gabriId = ids[Math.floor(Math.random() * ids.length)];
