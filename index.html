@@ -14,8 +14,8 @@
         :root {
             --primary: #00ffcc;
             --gabri: #ff3366;
-            --glass-bg: rgba(20, 20, 25, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-bg: rgba(20, 20, 25, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.15);
         }
 
         * {
@@ -37,6 +37,17 @@
             position: fixed; 
         }
 
+        /* CRT Scanline Effect */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
         canvas {
             display: block;
             width: 100vw;
@@ -51,10 +62,10 @@
 
         .glass-panel {
             background: var(--glass-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
             border: 1px solid var(--glass-border);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
             border-radius: 16px;
         }
 
@@ -75,42 +86,44 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #0d0d12; 
+            background: radial-gradient(circle at center, #1a1a24 0%, #0d0d12 100%);
             z-index: 50;
             transition: opacity 0.3s ease;
         }
 
-        .screen { display: none; width: 100%; max-width: 400px; padding: 20px; pointer-events: auto; }
+        .screen { display: none; width: 100%; max-width: 420px; padding: 25px; pointer-events: auto; }
         .screen.active { display: block; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; transform: translateY(40px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         h1 {
             font-family: 'Press Start 2P', cursive;
             text-align: center;
             color: white;
-            text-shadow: 0 0 10px var(--primary);
-            font-size: 24px;
-            margin-bottom: 10px; 
+            text-shadow: 0 0 15px var(--primary);
+            font-size: 26px;
+            margin-bottom: 15px; 
             line-height: 1.4;
         }
 
         .input-elite {
             width: 100%;
-            background: rgba(0,0,0,0.5);
-            border: 2px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.6);
+            border: 2px solid rgba(255,255,255,0.2);
             color: white;
             padding: 15px;
             border-radius: 12px;
-            font-size: 18px;
+            font-size: 20px;
+            font-weight: 600;
             text-align: center;
             outline: none;
             transition: all 0.2s;
+            letter-spacing: 1px;
         }
-        .input-elite:focus { border-color: var(--primary); box-shadow: 0 0 15px rgba(0,255,204,0.3); }
+        .input-elite:focus { border-color: var(--primary); box-shadow: 0 0 20px rgba(0,255,204,0.4); }
 
         .btn-elite {
             width: 100%;
@@ -118,18 +131,20 @@
             color: #000;
             font-weight: 800;
             font-size: 18px;
-            padding: 15px;
+            padding: 16px;
             border-radius: 12px;
             border: none;
             cursor: pointer;
             margin-top: 15px;
-            transition: transform 0.1s, box-shadow 0.1s;
+            transition: transform 0.1s, box-shadow 0.2s, opacity 0.2s;
             pointer-events: auto;
+            text-transform: uppercase;
+            box-shadow: 0 4px 15px rgba(0, 255, 204, 0.3);
         }
-        .btn-elite:active { transform: scale(0.96); }
-        .btn-elite:disabled { opacity: 0.7; cursor: not-allowed; }
+        .btn-elite:active { transform: scale(0.96); box-shadow: 0 2px 8px rgba(0, 255, 204, 0.3); }
+        .btn-elite:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
         
-        .btn-danger { background: linear-gradient(135deg, #ff3366 0%, #cc0033 100%); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #ff3366 0%, #cc0033 100%); color: white; box-shadow: 0 4px 15px rgba(255, 51, 102, 0.3); }
 
         .hud-header {
             display: flex;
@@ -139,54 +154,58 @@
         }
 
         .hud-box {
-            padding: 10px 20px;
-            border-radius: 12px;
+            padding: 12px 24px;
+            border-radius: 14px;
             color: white;
+            background: rgba(13, 13, 18, 0.8);
+            border: 1px solid rgba(255,255,255,0.1);
         }
 
-        .timer-text { font-family: 'Press Start 2P', cursive; font-size: 18px; color: var(--primary); }
-        .status-text { font-size: 16px; font-weight: 600; text-align: right; }
+        .timer-text { font-family: 'Press Start 2P', cursive; font-size: 20px; color: var(--primary); text-shadow: 0 0 10px var(--primary); }
+        .status-text { font-size: 16px; font-weight: 800; text-align: right; text-transform: uppercase; }
         
         .is-gabri-alert {
             animation: pulse-gabri 1s infinite alternate;
             color: var(--gabri) !important;
-            text-shadow: 0 0 10px var(--gabri);
+            text-shadow: 0 0 15px var(--gabri);
+            border-color: var(--gabri);
         }
 
         @keyframes pulse-gabri {
-            from { box-shadow: 0 0 10px var(--gabri), inset 0 0 10px var(--gabri); border-color: var(--gabri); }
-            to { box-shadow: 0 0 30px var(--gabri), inset 0 0 20px var(--gabri); border-color: transparent; }
+            from { box-shadow: 0 0 10px rgba(255,51,102,0.5); }
+            to { box-shadow: 0 0 30px rgba(255,51,102,0.8); }
         }
 
-        .player-list { max-height: 200px; overflow-y: auto; margin-bottom: 20px; pointer-events: auto; }
+        .player-list { max-height: 220px; overflow-y: auto; margin-bottom: 20px; pointer-events: auto; background: rgba(0,0,0,0.5); border-radius: 12px; }
         .player-item {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #ccc;
+            padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #ddd;
         }
         .player-item:last-child { border: none; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #00ffcc; box-shadow: 0 0 8px #00ffcc; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; background: #00ffcc; box-shadow: 0 0 10px #00ffcc; }
 
         .rank-row {
-            display: flex; justify-content: space-between; padding: 12px;
-            background: rgba(255,255,255,0.05); margin-bottom: 8px; border-radius: 8px;
-            font-weight: 600; color: white;
+            display: flex; justify-content: space-between; padding: 14px;
+            background: rgba(255,255,255,0.05); margin-bottom: 8px; border-radius: 10px;
+            font-weight: 600; color: white; font-size: 16px;
         }
         .rank-loser { background: rgba(255, 51, 102, 0.2); border: 1px solid var(--gabri); color: #ff99aa;}
         .rank-winner { background: rgba(0, 255, 204, 0.1); border: 1px solid var(--primary); color: var(--primary);}
 
         #floorDisplay {
             position: absolute;
-            bottom: 20px;
+            bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             border: 2px solid var(--primary);
             color: var(--primary);
-            padding: 10px 20px;
+            padding: 12px 24px;
             border-radius: 30px;
             font-family: 'Press Start 2P', cursive;
-            font-size: 14px;
-            text-shadow: 0 0 5px var(--primary);
+            font-size: 12px;
+            text-shadow: 0 0 8px var(--primary);
+            box-shadow: 0 0 15px rgba(0,255,204,0.3);
             pointer-events: none;
             display: none;
         }
@@ -194,6 +213,8 @@
     </style>
 </head>
 <body>
+
+    <div class="scanlines"></div>
 
     <script>
         const manifestJSON = {
@@ -211,12 +232,6 @@
         };
         const manifestBlob = new Blob([JSON.stringify(manifestJSON)], {type: "application/json"});
         document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${URL.createObjectURL(manifestBlob)}">`);
-
-        if ('serviceWorker' in navigator) {
-            const swCode = `self.addEventListener('fetch', e => {});`;
-            const swBlob = new Blob([swCode], {type: "application/javascript"});
-            navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
-        }
     </script>
 
     <canvas id="gameCanvas"></canvas>
@@ -225,38 +240,41 @@
 
     <div id="ui-layer" style="display: none;">
         <div class="hud-header">
-            <div class="glass-panel hud-box" id="hudTimerBox">
+            <div class="hud-box" id="hudTimerBox">
                 <div class="timer-text" id="timerDisplay">03:00</div>
             </div>
-            <div class="glass-panel hud-box" id="hudStatusBox">
+            <div class="hud-box" id="hudStatusBox">
                 <div class="status-text" id="roleDisplay">Lade...</div>
-                <div class="text-sm text-gray-400 mt-1" id="myTimeDisplay">Zeit als Gabri: 0.0s</div>
+                <div class="text-sm text-gray-400 mt-1 font-semibold" id="myTimeDisplay">Zeit als Gabri: 0.0s</div>
             </div>
         </div>
     </div>
 
     <div id="screens-layer">
         <div id="screen-login" class="screen glass-panel active">
-            <h1>GABRI<br><span style="color:white; font-size: 16px;">FLUCHT</span></h1>
-            <p class="text-gray-300 text-center mb-6 text-sm">
+            <h1>GABRI<br><span style="color:white; font-size: 14px; letter-spacing: 2px;">FLUCHT</span></h1>
+            <p class="text-gray-300 text-center mb-6 text-sm font-semibold">
                 Überlebe den Schulhof.<br>
-                <span class="text-xs text-primary">(Touch-Joysticks, WASD, A=Leertaste, B=Shift)</span>
+                <span class="text-xs text-primary font-normal mt-2 block">(Touch-Joysticks, WASD, A=Space, B=Shift)</span>
             </p>
             <input type="text" id="playerNameInput" class="input-elite" placeholder="Dein Name" maxlength="12" autocomplete="off">
-            <button id="btnJoin" class="btn-elite">WEITER</button>
+            <button id="btnJoin" class="btn-elite">SPIEL BEITRETEN</button>
         </div>
 
         <div id="screen-room" class="screen glass-panel">
             <h2 class="text-2xl font-bold text-center text-white mb-2">SERVER RAUM</h2>
-            <p class="text-gray-300 text-center mb-6 text-sm">Gib einen Code ein, um mit deinen Freunden zu spielen.</p>
-            <input type="text" id="roomCodeInput" class="input-elite uppercase" placeholder="Z.B. 1234" maxlength="6" autocomplete="off" style="text-transform: uppercase;">
-            <button id="btnJoinRoom" class="btn-elite">RAUM BETRETEN</button>
+            <p class="text-gray-300 text-center mb-6 text-sm">Erstelle einen Raum oder tritt bei.</p>
+            <input type="text" id="roomCodeInput" class="input-elite uppercase" placeholder="RAUM CODE (z.B. GABRI)" maxlength="8" autocomplete="off" style="text-transform: uppercase;">
+            <button id="btnJoinRoom" class="btn-elite">RAUM BETRETEN / ERSTELLEN</button>
         </div>
 
         <div id="screen-lobby" class="screen glass-panel">
-            <h2 id="lobbyTitle" class="text-2xl font-bold text-center text-primary mb-2">LOBBY</h2>
-            <p class="text-center text-gray-400 text-sm mb-4">Warte auf Mitspieler... (Namen in der Liste)</p>
-            <div class="glass-panel player-list p-2" id="lobbyPlayerList"></div>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-primary m-0">LOBBY</h2>
+                <button id="btnCopyCode" class="bg-gray-800 text-white text-xs px-3 py-2 rounded-lg border border-gray-600 hover:border-primary transition-colors">CODE: <span id="lobbyTitleCode" class="text-primary font-bold"></span> 📋</button>
+            </div>
+            <p class="text-center text-gray-400 text-sm mb-4">Warte auf Mitspieler...</p>
+            <div class="player-list p-2" id="lobbyPlayerList"></div>
             <button id="btnStartGame" class="btn-elite">RUNDE STARTEN (3 MIN)</button>
         </div>
 
@@ -294,7 +312,7 @@
             auth = getAuth(app);
             db = getFirestore(app);
         } catch (error) {
-            console.error("Firebase:", error);
+            console.error("Firebase Error:", error);
         }
 
         const GAME_DURATION_SEC = 180; 
@@ -316,7 +334,7 @@
             boss_active: false, boss_hp: 500, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
             sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null,
             mg_dropped: false, mg_owner: null, mg_x: 0, mg_y: 0, last_laser: null,
-            dead_npcs: {} 
+            dead_npcs: {}, energy_drinks: {}
         };
         
         let currentRoundId = null;
@@ -327,8 +345,8 @@
         let lastStairTime = 0; 
         let lastConfettiTs = 0;
         let localTimeLeft = 0;
+        let lastHeartbeatTs = 0; // BUGFIX: Permanenter Heartbeat für die Lobby
 
-        // Lokale Ball-Physik für perfekte Sync
         let localBall = { active: true, x: 2200, y: 1500, z: 0, vx: 0, vy: 0, vz: 0 };
         let lastBallTs = 0;
 
@@ -336,12 +354,17 @@
         let myFacing = { x: 1, y: 0 }; 
         let myHeldItem = null; 
         
+        let activeSpeedMult = 1.0; 
         let dashSpeedMult = 1.0;
+        let energyDrinkEndTime = 0;
         let lastDashTime = 0;
         let lastMgShot = 0;
         let lastSwordAttack = 0;
         let swordStartAngle = 0;
         
+        let isStealthMode = false; // FEATURE: Verstecken
+        let timeStandingStill = 0;
+
         let kb_vx = 0;
         let kb_vy = 0;
         let lastKnockbackTs = 0;
@@ -360,7 +383,8 @@
         let obstacles = [];
         let labels = [];
         let stairs = [];
-        let npcs = []; // Die 100 Charaktere
+        let npcs = []; 
+        let spawnDrinks = [];
         
         const hoop = { x: 2200, y: 1220, w: 100, h: 20 };
 
@@ -427,6 +451,9 @@
                         obstacles.push({x: tx + 50, y: ty - 25, w: 20, h: 20, isChair: true, dir: 'up'});
                         obstacles.push({x: tx + 10, y: ty + 45, w: 20, h: 20, isChair: true, dir: 'down'});
                         obstacles.push({x: tx + 50, y: ty + 45, w: 20, h: 20, isChair: true, dir: 'down'});
+                        
+                        // Deterministischer Energy Drink Spawn
+                        if (c % 3 === 0 && r % 2 === 0) spawnDrinks.push({ id: 'ed_'+tx+'_'+ty, x: tx+30, y: ty+10 });
                     }
                 }
             }
@@ -447,7 +474,6 @@
         stairs.push({ x: 1225, y: 1500, w: 150, h: 150, targetY: 3500, label: 'ZUM OG' });
         stairs.push({ x: 1225, y: 3500, w: 150, h: 150, targetY: 1500, label: 'ZUM EG' });
 
-        // --- NPC GENERATOR (100 Personen mit sicheren Routen) ---
         function mulberry32(a) {
             return function() {
               var t = a += 0x6D2B79F5;
@@ -460,20 +486,19 @@
 
         for (let i = 0; i < 100; i++) {
             let type, sx, sy, mx, my, spd;
-            if (i < 5) { // 5 Lehrer im Flur
+            if (i < 5) { 
                 type = 'teacher';
                 sx = 1250 + prng() * 150; sy = 200 + prng() * 1600;
                 mx = 0; my = (prng() > 0.5 ? 1 : -1) * (150 + prng() * 200); spd = 0.001;
-            } else if (i < 15) { // 10 Cheerleader IN der Turnhalle (1600-2800, 1300-1800)
+            } else if (i < 15) { 
                 type = 'cheerleader';
                 sx = 1600 + prng() * 1200; sy = 1300 + prng() * 500;
                 mx = 0; my = 0; spd = 0.005 + prng()*0.002;
-            } else { // 85 Schüler auf sicheren Flur-Routen (EG und OG Flure)
+            } else { 
                 type = 'student';
                 let inOG = prng() > 0.5;
                 sx = 1150 + prng() * 200; 
                 sy = (inOG ? 2100 : 100) + prng() * 1700;
-                // Schüler laufen auf und ab
                 mx = 0; my = (prng() > 0.5 ? 1 : -1) * (50 + prng() * 150); spd = 0.001 + prng() * 0.001;
             }
             npcs.push({ id: i, startX: sx, startY: sy, moveX: mx, moveY: my, speed: spd, type: type, currentX: sx, currentY: sy });
@@ -541,7 +566,7 @@
                 if (user) switchScreen('screen-room');
             } catch (e) {
                 alert("Firebase Fehler beim Login: " + e.message);
-                document.getElementById('btnJoin').innerText = "WEITER";
+                document.getElementById('btnJoin').innerText = "SPIEL BEITRETEN";
                 document.getElementById('btnJoin').disabled = false;
             }
         };
@@ -565,7 +590,7 @@
             let code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
             if (!code) code = Math.random().toString(36).substring(2, 6).toUpperCase();
             currentRoomId = code;
-            document.getElementById('lobbyTitle').innerText = "RAUM: " + currentRoomId;
+            document.getElementById('lobbyTitleCode').innerText = currentRoomId;
 
             myLocalPlayer.x = 1300 + Math.random()*100;
             myLocalPlayer.y = 1000 + Math.random()*100;
@@ -573,11 +598,15 @@
             camera.y = myLocalPlayer.y - window.innerHeight/2;
 
             const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
-            setDoc(playerRef, { id: user.uid, name: myName, roomId: currentRoomId, x: myLocalPlayer.x, y: myLocalPlayer.y, timeAsGabri: 0, lastSeen: Date.now() });
+            setDoc(playerRef, { id: user.uid, name: myName, roomId: currentRoomId, x: myLocalPlayer.x, y: myLocalPlayer.y, timeAsGabri: 0, lastSeen: Date.now(), isStealth: false });
 
             setupFirebaseListeners();
             requestAnimationFrame(gameLoop);
             switchScreen('screen-lobby');
+        });
+
+        document.getElementById('btnCopyCode').addEventListener('click', () => {
+            if(currentRoomId) navigator.clipboard.writeText(currentRoomId);
         });
 
         function setupFirebaseListeners() {
@@ -638,7 +667,6 @@
                         localBall.vx = newState.ball_vx || 0; localBall.vy = newState.ball_vy || 0;
                         localBall.z = 40; localBall.vz = 350; 
                     } else if (newState.ball_owner == null && !localBall.active) {
-                        // Initiale Platzierung, wenn er nur rumliegt
                         localBall.active = true;
                         localBall.x = newState.ball_x; localBall.y = newState.ball_y;
                         localBall.z = 0; localBall.vx = 0; localBall.vy = 0;
@@ -661,17 +689,18 @@
                 if(activeIds.length === 0) activeIds.push(user.uid);
                 const randomGabri = activeIds[Math.floor(Math.random() * activeIds.length)];
 
-                let initialPallets = {};
-                mapPallets.forEach(p => initialPallets['pallet_'+p.id] = 0);
+                let initialItems = {};
+                mapPallets.forEach(p => initialItems['pallet_'+p.id] = 0);
+                spawnDrinks.forEach(d => initialItems['drink_'+d.id] = true);
 
                 await setDoc(roomRef, {
-                    ...initialPallets,
+                    ...initialItems,
                     isPlaying: true,
                     roundId: Math.random().toString(36).substring(2, 9),
                     currentGabri: randomGabri,
                     tagCounter: 0,
                     hostId: user.uid,
-                    endTime: Date.now() + GAME_DURATION_SEC * 1000, // Uhrzeit-Sicheres System
+                    endTime: Date.now() + GAME_DURATION_SEC * 1000, 
                     ball_x: 2200, ball_y: 1500, ball_vx: 0, ball_vy: 0, ball_owner: null, ball_ts: 0,
                     boss_active: false, boss_hp: 500, boss_x: 1500, boss_y: 3000, boss_tx: 1500, boss_ty: 3000,
                     sword1_owner: null, sword2_owner: null, sword3_owner: null, sword4_owner: null,
@@ -764,7 +793,7 @@
             });
         }
 
-        // --- 8. INPUT HANDLING (FESTE UI JOYSTICKS & BUTTONS) ---
+        // --- 8. INPUT HANDLING ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
@@ -891,6 +920,7 @@
             const isGabri = (localCurrentGabri === user.uid);
             const now = Date.now();
             
+            // PRIO 1: PALLETS (DbD Style)
             let nearestPallet = null; let minDistP = 120;
             for (let p of mapPallets) {
                 let pcx = p.dropRect.x + p.dropRect.w/2; let pcy = p.dropRect.y + p.dropRect.h/2;
@@ -982,7 +1012,6 @@
                     }
                 }
                 
-                // Sende auch eine "Action" Notification über den Spieler (für die Waffen-Animation der Mitspieler)
                 updateDoc(myPlayerRef, { action_ts: now, action_type: 'shoot' });
                 updateDoc(roomRef, updates);
                 return;
@@ -1011,7 +1040,6 @@
                     }
                 }
                 
-                // Synchronisiere den Schwertschwung für Mitspieler
                 updateDoc(myPlayerRef, { action_ts: now, action_type: 'sword', action_angle: swordStartAngle });
                 if (Object.keys(updates).length > 0) updateDoc(roomRef, updates);
                 return;
@@ -1028,6 +1056,19 @@
                 if (!gameState[sKey+'_owner'] && Math.hypot(cx - sBase.x, cy - sBase.y) < 100) {
                     myHeldItem = sKey;
                     let update = {}; update[sKey+'_owner'] = user.uid; updateDoc(roomRef, update); return;
+                }
+            }
+            
+            // Energy Drink Check
+            for(let d of spawnDrinks) {
+                if (gameState.energy_drinks && gameState.energy_drinks[d.id]) continue;
+                if (Math.hypot(cx - d.x, cy - d.y) < 60) {
+                    let up = {}; up['energy_drinks.' + d.id] = true;
+                    updateDoc(roomRef, up);
+                    activeSpeedMult = 1.8;
+                    energyDrinkEndTime = now + 5000;
+                    createParticles(cx, cy, '#00ffcc');
+                    return;
                 }
             }
         }
@@ -1050,6 +1091,10 @@
                 if (gameState['pallet_'+p.id] === 1) { 
                     if (nx < p.dropRect.x + p.dropRect.w && nx + PLAYER_SIZE > p.dropRect.x && ny < p.dropRect.y + p.dropRect.h && ny + PLAYER_SIZE > p.dropRect.y) return true;
                 }
+            }
+            for (let npc of npcs) {
+                if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) continue;
+                if (nx < npc.currentX + PLAYER_SIZE && nx + PLAYER_SIZE > npc.currentX && ny < npc.currentY + PLAYER_SIZE && ny + PLAYER_SIZE > npc.currentY) return true;
             }
             return false;
         }
@@ -1078,6 +1123,8 @@
             for (let id in serverPlayers) {
                 if (id === user.uid) continue;
                 const p = gameEntities[id] || serverPlayers[id];
+                if (serverPlayers[id].isStealth) continue; // Gabri kann keine versteckten Spieler taggen!
+                
                 const cx1 = myLocalPlayer.x + PLAYER_SIZE/2; const cy1 = myLocalPlayer.y + PLAYER_SIZE/2;
                 const cx2 = p.x + PLAYER_SIZE/2; const cy2 = p.y + PLAYER_SIZE/2;
                 
@@ -1098,6 +1145,16 @@
             }
         }
 
+        // --- GLOBALER HEARTBEAT (BEHEBT DEN LOBBY-BUG!) ---
+        setInterval(() => {
+            const now = Date.now();
+            if (user && currentRoomId && now - lastHeartbeatTs > 2000) {
+                lastHeartbeatTs = now;
+                const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+                updateDoc(myRef, { lastSeen: now }).catch(()=>{});
+            }
+        }, 2000);
+
         function gameLoop(timestamp) {
             const dt = Math.min((timestamp - lastUpdateTime) / 1000, 0.1); 
             lastUpdateTime = timestamp;
@@ -1105,7 +1162,6 @@
 
             if (user) {
                 
-                // HOST LOGIC (Timer, Boss)
                 if (gameState.isPlaying && gameState.endTime > 0) {
                     localTimeLeft = Math.max(0, Math.floor((gameState.endTime - now) / 1000));
                     
@@ -1127,7 +1183,7 @@
                         if (gameState.boss_active && gameState.boss_hp > 0) {
                             let nearestId = null; let minDist = 9999;
                             for (let id in serverPlayers) {
-                                if (serverPlayers[id].y > 2000) {
+                                if (serverPlayers[id].y > 2000 && !serverPlayers[id].isStealth) {
                                     let d = Math.hypot(serverPlayers[id].x - gameState.boss_x, serverPlayers[id].y - gameState.boss_y);
                                     if (d < minDist) { minDist = d; nearestId = id; }
                                 }
@@ -1152,14 +1208,26 @@
                     const move = getMovementVector();
                     
                     if (dashSpeedMult > 1.0) { dashSpeedMult -= dt * 6; if (dashSpeedMult < 1.0) dashSpeedMult = 1.0; }
+                    if (now > energyDrinkEndTime) activeSpeedMult = 1.0;
 
-                    let mx = (move.dx * BASE_SPEED * dashSpeedMult + kb_vx) * dt;
-                    let my = (move.dy * BASE_SPEED * dashSpeedMult + kb_vy) * dt;
+                    let mx = (move.dx * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vx) * dt;
+                    let my = (move.dy * BASE_SPEED * activeSpeedMult * dashSpeedMult + kb_vy) * dt;
                     kb_vx *= 0.85; kb_vy *= 0.85; 
 
-                    if (Math.abs(move.dx) > 0.1 || Math.abs(move.dy) > 0.1) {
+                    // Verstecken (Stealth)
+                    if (Math.abs(move.dx) < 0.1 && Math.abs(move.dy) < 0.1 && kb_vx < 1 && kb_vy < 1) {
+                        timeStandingStill += dt;
+                    } else {
+                        timeStandingStill = 0;
                         const len = Math.hypot(move.dx, move.dy);
-                        myFacing = { x: move.dx/len, y: move.dy/len };
+                        if (len > 0) myFacing = { x: move.dx/len, y: move.dy/len };
+                    }
+                    
+                    let newStealth = timeStandingStill > 2.0;
+                    if (newStealth !== isStealthMode) {
+                        isStealthMode = newStealth;
+                        const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+                        updateDoc(myRef, { isStealth: isStealthMode }).catch(()=>{});
                     }
 
                     if (!checkWall(myLocalPlayer.x + mx, myLocalPlayer.y)) myLocalPlayer.x += mx;
@@ -1168,14 +1236,13 @@
                     checkStairs(myLocalPlayer.x, myLocalPlayer.y, now);
 
                     if (gameState.boss_active && gameState.boss_hp > 0 && myLocalPlayer.y > 2000) {
-                        if (Math.hypot(myLocalPlayer.x - gameState.boss_x, myLocalPlayer.y - gameState.boss_y) < 100) {
+                        if (Math.hypot(myLocalPlayer.x - gameState.boss_x, myLocalPlayer.y - gameState.boss_y) < 100 && !isStealthMode) {
                             myLocalPlayer.x -= myFacing.x * 200; 
                             myLocalPlayer.y -= myFacing.y * 200;
                             createParticles(myLocalPlayer.x, myLocalPlayer.y, '#ff0000');
                         }
                     }
 
-                    // LOKALE BALL PHYSIK
                     if (!gameState.ball_owner && localBall.active) {
                         let bnx = localBall.x + localBall.vx * dt;
                         let bny = localBall.y + localBall.vy * dt;
@@ -1222,7 +1289,7 @@
                     if (now - lastSyncTime > 100) { 
                         lastSyncTime = now;
                         const myRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
-                        updateDoc(myRef, { x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y), lastSeen: now, roomId: currentRoomId }).catch(()=>{});
+                        updateDoc(myRef, { x: Math.round(myLocalPlayer.x), y: Math.round(myLocalPlayer.y), roomId: currentRoomId }).catch(()=>{});
                     }
 
                     checkTags();
@@ -1241,6 +1308,7 @@
 
         function render(dt, nowTime) {
             npcs.forEach(npc => {
+                if (gameState.dead_npcs && gameState.dead_npcs[npc.id]) return;
                 const offset = Math.sin(nowTime * npc.speed);
                 npc.currentX = npc.startX + npc.moveX * offset;
                 npc.currentY = npc.startY + npc.moveY * offset;
@@ -1287,6 +1355,13 @@
                     ctx.fillStyle = '#3E2723';
                     if (obs.dir === 'up') ctx.fillRect(obs.x, obs.y, obs.w, 5); else ctx.fillRect(obs.x, obs.y + obs.h - 5, obs.w, 5);
                 }
+            }
+
+            for(let d of spawnDrinks) {
+                if (gameState.energy_drinks && gameState.energy_drinks[d.id]) continue;
+                if ((isInOG && d.y < 2000) || (!isInOG && d.y > 2000)) continue;
+                ctx.fillStyle = '#0055ff'; ctx.fillRect(d.x, d.y, 8, 12);
+                ctx.fillStyle = '#silver'; ctx.fillRect(d.x, d.y - 2, 8, 2);
             }
 
             for(let p of mapPallets) {
@@ -1419,8 +1494,15 @@
                 let isMoving = isMe ? (Math.abs(getMovementVector().dx) > 0 || Math.abs(getMovementVector().dy) > 0) : (Math.hypot(sp.x - px, sp.y - py) > 5);
                 let frame = isMoving ? Math.floor(nowTime / 150) % 2 : 0;
                 
-                ctx.drawImage(isGabri ? texGabri[frame] : texNormal[frame], px, py, PLAYER_SIZE, PLAYER_SIZE);
+                let stealth = isMe ? isStealthMode : sp.isStealth;
+                if (stealth) {
+                    ctx.globalAlpha = 0.4; // Versteckt
+                    ctx.drawImage(isGabri ? texGabri[frame] : texNormal[frame], px, py + 15, PLAYER_SIZE, PLAYER_SIZE - 15);
+                } else {
+                    ctx.drawImage(isGabri ? texGabri[frame] : texNormal[frame], px, py, PLAYER_SIZE, PLAYER_SIZE);
+                }
                 ctx.shadowBlur = 0; 
+                ctx.globalAlpha = 1.0;
 
                 let playerHeldItem = null;
                 if (isMe) playerHeldItem = myHeldItem;
@@ -1430,7 +1512,6 @@
                 }
                 
                 if (playerHeldItem && playerHeldItem.startsWith('sword')) {
-                    // MULTIPLAYER SWORD ANIMATION
                     let swingTs = isMe ? lastSwordAttack : sp.action_ts;
                     let isSwinging = (sp.action_type === 'sword' || isMe) && (nowTime - swingTs < 200);
 
@@ -1457,12 +1538,35 @@
                     ctx.arc(px + PLAYER_SIZE/2, py + PLAYER_SIZE/2, PLAYER_SIZE*0.8, -Math.PI/2, (-Math.PI/2) + (Math.PI*2*progress)); ctx.stroke();
                 }
 
-                ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
-                ctx.font = '600 14px "Outfit"'; ctx.textAlign = 'center';
-                const textWidth = ctx.measureText(sp.name).width;
-                ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(px + PLAYER_SIZE/2 - textWidth/2 - 4, py - 24, textWidth + 8, 18);
-                ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
-                ctx.fillText(sp.name, px + PLAYER_SIZE/2, py - 10);
+                if (!stealth) {
+                    ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
+                    ctx.font = '600 14px "Outfit"'; ctx.textAlign = 'center';
+                    const textWidth = ctx.measureText(sp.name).width;
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(px + PLAYER_SIZE/2 - textWidth/2 - 4, py - 24, textWidth + 8, 18);
+                    ctx.fillStyle = isGabri ? '#ff99aa' : (isMe ? '#00ffcc' : 'white');
+                    ctx.fillText(sp.name, px + PLAYER_SIZE/2, py - 10);
+                }
+            }
+
+            // NIGHT MODE ANOMALY (Letzte 30 Sekunden)
+            if (localTimeLeft > 0 && localTimeLeft <= 30) {
+                ctx.fillStyle = 'rgba(2, 2, 5, 0.96)'; 
+                ctx.fillRect(camera.x, camera.y, canvas.width, canvas.height);
+                
+                ctx.globalCompositeOperation = 'destination-out';
+                for(let id in serverPlayers) {
+                    const sp = serverPlayers[id];
+                    let px = (id === user?.uid) ? myLocalPlayer.x : (gameEntities[id]?.x || sp.x);
+                    let py = (id === user?.uid) ? myLocalPlayer.y : (gameEntities[id]?.y || sp.y);
+                    if (!((isInOG && py < 2000) || (!isInOG && py > 2000))) {
+                        let rad = ctx.createRadialGradient(px + 20, py + 20, 10, px + 20, py + 20, 200);
+                        rad.addColorStop(0, 'rgba(255,255,255,1)');
+                        rad.addColorStop(1, 'rgba(255,255,255,0)');
+                        ctx.fillStyle = rad;
+                        ctx.beginPath(); ctx.arc(px + 20, py + 20, 200, 0, Math.PI*2); ctx.fill();
+                    }
+                }
+                ctx.globalCompositeOperation = 'source-over';
             }
 
             ctx.restore(); 
