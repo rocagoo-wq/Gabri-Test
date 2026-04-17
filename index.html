@@ -414,8 +414,8 @@
                 </span>
             </p>
             
-            <!-- SERVER STATUS UI (CRITICAL FIX) -->
-            <div id="serverStatus" class="text-xs text-yellow-400 text-center mb-3 font-bold bg-gray-900 p-2 rounded border border-yellow-900">
+            <!-- SERVER STATUS UI -->
+            <div id="serverStatus" class="text-xs text-yellow-400 text-center mb-3 font-bold bg-gray-900 p-2 rounded border border-yellow-900 transition-all">
                 📡 INITIIERE VERBINDUNG...
             </div>
 
@@ -489,7 +489,6 @@
         // ----------------------------------------------------------------------
         // 1. FIREBASE CONFIGURATION (ENTERPRISE STANDARD)
         // ----------------------------------------------------------------------
-        // BUGFIX: Unity of variable naming to prevent ReferenceError crash!
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'gabri-2026-core';
         
         const FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
@@ -678,7 +677,7 @@
                 const el = document.getElementById('serverStatus');
                 if (el) {
                     el.innerText = msg;
-                    el.className = "text-xs text-center mb-3 font-bold bg-gray-900 p-2 rounded border " + colorClass;
+                    el.className = "text-xs text-center mb-3 font-bold p-2 rounded border transition-all " + colorClass;
                 }
             }
         };
@@ -1364,16 +1363,24 @@
         // Auto-Initialize Auth in background
         async function performAutoAuth() {
             try {
-                if (!auth.currentUser) {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                }
+                if (!auth) throw new Error("Firebase Konfiguration fehlerhaft.");
                 
-                onAuthStateChanged(auth, (user) => {
+                // Watchdog Timeout - falls Firebase blockiert wird (Adblocker etc.)
+                const watchDog = setTimeout(() => {
+                    if (!isAuthReady) {
+                        UIManager.setStatus("🔴 FEHLER: SERVER ANTWORTET NICHT (ADBLOCKER?)", "text-red-400 border-red-900");
+                        const btn = document.getElementById('btnJoin');
+                        if (btn) {
+                            btn.innerText = "FEHLER (SEITE NEU LADEN)";
+                            btn.disabled = true;
+                        }
+                    }
+                }, 8000);
+
+                // Passiver Auth-Listener (Verhindert Race-Conditions)
+                onAuthStateChanged(auth, async (user) => {
                     if (user) {
+                        clearTimeout(watchDog);
                         currentUser = user;
                         isAuthReady = true;
                         
@@ -1384,12 +1391,24 @@
                             btn.innerText = "SYSTEM STARTEN";
                             btn.disabled = false;
                         }
+                    } else {
+                        // Nur einloggen, wenn WIRKLICH noch keine Session existiert
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                await signInWithCustomToken(auth, __initial_auth_token);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                        } catch (err) {
+                            clearTimeout(watchDog);
+                            console.error("Login Error:", err);
+                            UIManager.setStatus("🔴 OFFLINE: " + (err.code || "Verbindungsfehler"), "text-red-400 border-red-900");
+                        }
                     }
                 });
             } catch (e) {
                 console.error("Auth Init Failed:", e);
-                UIManager.setStatus("🔴 OFFLINE: " + e.code, "text-red-400 border-red-900");
-                alert("Verbindungsfehler zur Datenbank. Überprüfe die Firebase Konfiguration.");
+                UIManager.setStatus("🔴 OFFLINE: " + e.message, "text-red-400 border-red-900");
             }
         }
         
@@ -1398,14 +1417,20 @@
 
         document.getElementById('btnJoin').addEventListener('click', () => {
             const name = document.getElementById('playerNameInput').value.trim();
-            if (!name) { alert("Bitte gib einen Namen ein!"); return; }
-            if (!isAuthReady || !currentUser) { alert("Warte auf Serververbindung..."); return; }
+            if (!name) { 
+                UIManager.setStatus("⚠️ BITTE NAMEN EINGEBEN!", "text-yellow-400 border-yellow-900");
+                return; 
+            }
+            if (!isAuthReady || !currentUser) { 
+                UIManager.setStatus("⚠️ WARTE AUF SERVER...", "text-yellow-400 border-yellow-900");
+                return; 
+            }
             
             myName = name.substring(0, 12);
             sfx.enable(); 
             UIManager.switchScreen('screen-room');
             
-            // LOBBY COUNTER
+            // LOBBY COUNTER START
             if (!playersUnsubscribe) {
                 onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'players'), (snapshot) => {
                     const counts = {"GABRI RAUM": 0, "RAUM DES GABRIS": 0, "GABRILOGIE": 0, "GABRIELS": 0};
