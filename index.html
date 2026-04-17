@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0a0a0f">
-<title>GABRI-FLUCHT 2.0</title>
+<title>Gabri Flucht</title>
 
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Grotesk:wght@500;700&family=Rubik+Mono+One&display=swap" rel="stylesheet">
 
 <style>
 /* ========================================================================
-   GABRI-FLUCHT 2.0 — Arcade Terminal Aesthetic
+   GABRI FLUCHT — Arcade Terminal Aesthetic
    ======================================================================== */
 
 :root {
@@ -272,6 +272,7 @@ button.btn.ghost:hover:not(:disabled) { background: var(--ink); color: #000; tra
   font-size: 22px; letter-spacing: 2px; text-transform: uppercase;
   z-index: 30; pointer-events: none; display: none;
   box-shadow: 0 0 40px rgba(252,238,10,.6);
+  text-align: center;
 }
 #banner.on { display: block; animation: bannerIn .25s ease-out, bannerGlitch .15s .25s 3; }
 @keyframes bannerIn { from { transform: translateX(-50%) translateY(-20px); opacity: 0; } }
@@ -319,7 +320,7 @@ button.btn.ghost:hover:not(:disabled) { background: var(--ink); color: #000; tra
     <div class="card" id="statusCard">
       <div class="timer" id="timer">03:00</div>
       <div class="role-line" id="role">READY</div>
-      <div class="info-row" id="infoRow">YOUR TIME: 0.0s</div>
+      <div class="info-row" id="infoRow">DEINE ZEIT: 0.0s</div>
     </div>
   </div>
 </div>
@@ -333,7 +334,7 @@ button.btn.ghost:hover:not(:disabled) { background: var(--ink); color: #000; tra
   <!-- MAIN -->
   <div id="s-main" class="screen on">
     <div class="panel">
-      <span class="tag">v2.0 / ARCADE EDITION</span>
+      <span class="tag">v3.0 / ARCADE EDITION</span>
       <h1>GABRI<br>FLUCHT<span class="sub">· EINER IST ES ·</span></h1>
 
       <div class="terminal" id="term">
@@ -352,9 +353,6 @@ button.btn.ghost:hover:not(:disabled) { background: var(--ink); color: #000; tra
 
       <select id="inMode" class="t">
         <option value="solo">MODUS: SOLO vs BOTS</option>
-        <option value="room-A">MULTIPLAYER: RAUM ALPHA</option>
-        <option value="room-B">MULTIPLAYER: RAUM BETA</option>
-        <option value="room-C">MULTIPLAYER: RAUM GAMMA</option>
       </select>
 
       <button id="btnPlay" class="btn">EINSTEIGEN</button>
@@ -384,7 +382,7 @@ button.btn.ghost:hover:not(:disabled) { background: var(--ink); color: #000; tra
       <h2 id="overTitle">RUNDE ENDE</h2>
       <div class="terminal" id="overTerm"></div>
       <div id="ranks" style="margin-bottom: 14px;"></div>
-      <button id="btnAgain" class="btn">NOCHMAL</button>
+      <button id="btnAgain" class="btn">NOCHMAL SPIELEN</button>
       <button id="btnHome"  class="btn ghost">ZURÜCK ZUM HUB</button>
     </div>
   </div>
@@ -394,33 +392,7 @@ button.btn.ghost:hover:not(:disabled) { background: var(--ink); color: #000; tra
 <!-- ========================================================================
      GAME ENGINE
      ======================================================================== -->
-<script type="module">
-/* ========================================================================
-   0. FIREBASE (optional — falls verfügbar)
-   ======================================================================== */
-let fb = null;
-try {
-  const fbApp  = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
-  const fbAuth = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-  const fbDb   = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-
-  const cfg = {
-    apiKey: "AIzaSyDWM2Dnq72MeWuZcV3uT4YXg0G9nyZIVAc",
-    authDomain: "gabri-4f94c.firebaseapp.com",
-    projectId: "gabri-4f94c",
-    storageBucket: "gabri-4f94c.firebasestorage.app",
-    messagingSenderId: "415746495575",
-    appId: "1:415746495575:web:c9730e19c9ac3e6d923f12"
-  };
-  const app  = fbApp.initializeApp(cfg);
-  const auth = fbAuth.getAuth(app);
-  const db   = fbDb.getFirestore(app);
-
-  fb = { app, auth, db, ...fbAuth, ...fbDb };
-} catch (e) {
-  console.warn("Firebase nicht verfügbar — Solo-Modus only.", e);
-}
-
+<script>
 /* ========================================================================
    1. CONFIG
    ======================================================================== */
@@ -429,13 +401,12 @@ const CFG = {
   P_SIZE: 28,
   BASE_SPEED: 220,
   DASH_MULT: 3.0,  DASH_DUR: 0.18,  DASH_CD: 1.4,
-  TAG_COOLDOWN: 1500,   // ms after being tagged
-  STEALTH_TIME: 2.0,    // seconds standing still
+  TAG_COOLDOWN: 1500,    // ms after being tagged
+  STEALTH_TIME: 2.0,     // seconds standing still
   ROUND_SECONDS: 180,
-  BOSS_START: 60,       // boss appears at this second remaining
-  BOSS_HP: 8,           // sword hits
-  NUM_BOTS: 5,
-  APP_ID: "gabri-2-0"
+  BOSS_START: 60,        // boss appears at this second remaining
+  BOSS_HP: 8,            // sword hits
+  NUM_BOTS: 6,
 };
 
 const COL = {
@@ -452,7 +423,7 @@ const COL = {
 /* ========================================================================
    2. AUDIO — synthesized
    ======================================================================== */
-class Audio {
+class AudioEngine {
   constructor() {
     this.ctx = null; this.gain = null; this.enabled = false;
   }
@@ -502,20 +473,13 @@ class Audio {
   door()   { this.tone(220,"square",.05,.3); }
   pallet() { this.noise(.3,.7,600); }
 }
-const sfx = new Audio();
+const sfx = new AudioEngine();
 
 /* ========================================================================
-   3. MAP — Schulgebäude mit Zimmern, Türen, Turnhalle, Palletts
+   3. MAP — Schulgebäude
    ======================================================================== */
 const MAP = {
-  walls: [],       // {x,y,w,h}
-  doors: [],       // openings (not drawn as walls, just visual)
-  rooms: [],       // {x,y,w,h,label,color}
-  pallets: [],     // {id, x,y,w,h, state: 0=upright, 1=down}
-  hoops: [],       // {x,y, color}
-  lockers: [],     // {x,y,w,h}
-  benches: [],     // {x,y,w,h} gym benches
-  bossArea: null,
+  walls: [], doors: [], rooms: [], pallets: [], hoops: [], lockers: [], benches: [], bossArea: null,
   spawn: { x: 400, y: 250 }
 };
 
@@ -532,7 +496,6 @@ function buildMap() {
   MAP.walls.push({ x: 0, y: 0, w: T, h: H });
   MAP.walls.push({ x: W - T, y: 0, w: T, h: H });
 
-  // --- Main hallway runs horizontally across middle ---
   // Upper classrooms row
   buildRoom(T, T, 420, 320, "KLASSE 1A", COL.floor1, { doorSide: "S", doorOff: 180 });
   buildRoom(T + 420, T, 420, 320, "KLASSE 1B", COL.floor1, { doorSide: "S", doorOff: 180 });
@@ -542,42 +505,24 @@ function buildMap() {
 
   // Lower row
   buildRoom(T, H - T - 360, 340, 360, "UMKLEIDE", COL.locker, { doorSide: "N", doorOff: 150, lockers: true });
-  // Turnhalle (gym) — big room
-  buildRoom(T + 340, H - T - 460, 900, 460, "TURNHALLE", COL.gym,
-           { doorSide: "N", doorOff: 420, gym: true });
+  buildRoom(T + 340, H - T - 460, 900, 460, "TURNHALLE", COL.gym, { doorSide: "N", doorOff: 420, gym: true });
   buildRoom(T + 1240, H - T - 360, 440, 360, "MENSA", COL.floor2, { doorSide: "N", doorOff: 200, benches: true });
   buildRoom(T + 1680, H - T - 360, W - T - T - 1680, 360, "HOF-AUSGANG", COL.floor1, { doorSide: "N", doorOff: 200 });
 
-  // Middle vertical divider forming hallway structure
-  // Hallway runs between y ~340 and y ~(H-460), with pillars as obstacles
-  // Add a few pillars / obstacles in hallway for line-of-sight interest
-  pushPillar(T + 450, 560);
-  pushPillar(T + 1100, 560);
-  pushPillar(T + 1800, 560);
-  pushPillar(T + 600, 980);
-  pushPillar(T + 1400, 980);
-  pushPillar(T + 2000, 980);
+  // Middle hallway obstacles
+  pushPillar(T + 450, 560); pushPillar(T + 1100, 560); pushPillar(T + 1800, 560);
+  pushPillar(T + 600, 980); pushPillar(T + 1400, 980); pushPillar(T + 2000, 980);
 
-  // --- Palletts (DbD style) in the hallway ---
   const palletSpots = [
-    { x: 340, y: 700 },
-    { x: 900, y: 700 },
-    { x: 1550, y: 700 },
-    { x: 2060, y: 700 },
-    { x: 600, y: 1080 },
-    { x: 1350, y: 1080 },
-    { x: 2000, y: 1080 }
+    { x: 340, y: 700 }, { x: 900, y: 700 }, { x: 1550, y: 700 },
+    { x: 2060, y: 700 }, { x: 600, y: 1080 }, { x: 1350, y: 1080 }, { x: 2000, y: 1080 }
   ];
-  palletSpots.forEach((p, i) => {
-    MAP.pallets.push({ id: "p"+i, x: p.x, y: p.y, w: 10, h: 80, state: 0, cd: 0 });
-  });
+  palletSpots.forEach((p, i) => { MAP.pallets.push({ id: "p"+i, x: p.x, y: p.y, w: 10, h: 80, state: 0, cd: 0 }); });
 
-  // --- Basketball hoops in gym ---
   const gymL = T + 340, gymT = H - T - 460, gymR = gymL + 900;
   MAP.hoops.push({ x: gymL + 40, y: gymT + 230, side: "L" });
   MAP.hoops.push({ x: gymR - 40, y: gymT + 230, side: "R" });
 
-  // Boss spawn area (center of hall)
   MAP.bossArea = { x: W/2 - 60, y: H/2 - 60, w: 120, h: 120 };
 }
 
@@ -587,92 +532,48 @@ function buildRoom(x, y, w, h, label, color, opts = {}) {
   // top
   if (opts.doorSide === "N") {
     const off = opts.doorOff || 100, door = 90;
-    MAP.walls.push({ x, y, w: off, h: T });
-    MAP.walls.push({ x: x + off + door, y, w: w - off - door, h: T });
+    MAP.walls.push({ x, y, w: off, h: T }); MAP.walls.push({ x: x + off + door, y, w: w - off - door, h: T });
   } else MAP.walls.push({ x, y, w, h: T });
   // bottom
   if (opts.doorSide === "S") {
     const off = opts.doorOff || 100, door = 90;
-    MAP.walls.push({ x, y: y + h - T, w: off, h: T });
-    MAP.walls.push({ x: x + off + door, y: y + h - T, w: w - off - door, h: T });
+    MAP.walls.push({ x, y: y + h - T, w: off, h: T }); MAP.walls.push({ x: x + off + door, y: y + h - T, w: w - off - door, h: T });
   } else MAP.walls.push({ x, y: y + h - T, w, h: T });
   // left
   if (opts.doorSide === "W") {
     const off = opts.doorOff || 100, door = 90;
-    MAP.walls.push({ x, y, w: T, h: off });
-    MAP.walls.push({ x, y: y + off + door, w: T, h: h - off - door });
+    MAP.walls.push({ x, y, w: T, h: off }); MAP.walls.push({ x, y: y + off + door, w: T, h: h - off - door });
   } else MAP.walls.push({ x, y, w: T, h });
   // right
   if (opts.doorSide === "E") {
     const off = opts.doorOff || 100, door = 90;
-    MAP.walls.push({ x: x + w - T, y, w: T, h: off });
-    MAP.walls.push({ x: x + w - T, y: y + off + door, w: T, h: h - off - door });
+    MAP.walls.push({ x: x + w - T, y, w: T, h: off }); MAP.walls.push({ x: x + w - T, y: y + off + door, w: T, h: h - off - door });
   } else MAP.walls.push({ x: x + w - T, y, w: T, h });
 
-  if (opts.lockers) {
-    for (let i = 0; i < 4; i++) {
-      MAP.lockers.push({ x: x + 40 + i * 50, y: y + 40, w: 40, h: 50 });
-      MAP.walls.push({ x: x + 40 + i * 50, y: y + 40, w: 40, h: 50 });
-    }
-  }
-  if (opts.benches) {
-    for (let i = 0; i < 3; i++) {
-      MAP.benches.push({ x: x + 30, y: y + 50 + i * 80, w: w - 60, h: 20 });
-      MAP.walls.push({ x: x + 30, y: y + 50 + i * 80, w: w - 60, h: 20 });
-    }
-  }
   if (opts.gym) {
-    // center line
     MAP.rooms.push({ x: x + w/2 - 2, y: y + T, w: 4, h: h - T*2, color: "rgba(252,238,10,0.08)", label: null });
-    // circle center
     MAP.rooms.push({ x: x + w/2 - 60, y: y + h/2 - 60, w: 120, h: 120, color: "rgba(252,238,10,0.05)", label: null, circle: true });
   }
 }
-function pushPillar(x, y) {
-  MAP.walls.push({ x, y, w: 40, h: 40, pillar: true });
-}
-
+function pushPillar(x, y) { MAP.walls.push({ x, y, w: 40, h: 40, pillar: true }); }
 buildMap();
 
 /* ========================================================================
    4. STATE
    ======================================================================== */
 const S = {
-  mode: "solo",       // "solo" | "room-A" ...
-  running: false,
-  screen: "main",     // main/lobby/game/over
-
-  myId: null,
-  myName: "RUNNER",
-  isHost: true,
-
-  players: {},        // id -> { name, x,y, vx,vy, facing, heldItem, isStealth, stillT, timeAsGabri, isBot, color, dashT, dashCd, tagCd }
-  gabriId: null,
-
+  running: false, screen: "main",
+  myId: null, myName: "RUNNER",
+  players: {}, gabriId: null,
   ball: { x: 0, y: 0, vx: 0, vy: 0, z: 0, vz: 0, owner: null, active: true },
-  pallets: {},        // id -> state & cd (source of truth on host)
-  boss: null,         // { x,y, tx, ty, hp, active }
-  mg: null,           // dropped MG { x, y, owner }
-
-  particles: [],
-  cam: { x: 0, y: 0 },
-  timeLeft: CFG.ROUND_SECONDS,
-  lastTick: 0,
-  lastMgFire: 0,
-  cheerDance: 0,
-
-  // Firebase specific
-  roomId: null,
-  fbUnsub: [],
-  lastSync: 0,
-
-  // Assist
-  bannerTimer: 0,
-  toastTimer: 0,
+  pallets: {}, boss: null, mg: null,
+  particles: [], cam: { x: 0, y: 0 },
+  timeLeft: CFG.ROUND_SECONDS, lastTick: 0, lastMgFire: 0, cheerDance: 0,
+  bannerTimer: 0, toastTimer: 0, screenShake: 0
 };
 
 /* ========================================================================
-   5. DOM
+   5. DOM & INPUT
    ======================================================================== */
 const $ = (id) => document.getElementById(id);
 const canvas = $("game");
@@ -686,9 +587,6 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-/* ========================================================================
-   6. INPUT — Keyboard + Virtual Joystick + Buttons
-   ======================================================================== */
 const IN = {
   keys: {},
   joy: { active: false, id: null, bx: 0, by: 0, nx: 0, ny: 0, dx: 0, dy: 0, r: 60 },
@@ -705,7 +603,6 @@ function layoutControls() {
   IN.btnC.x = w - 90;  IN.btnC.y = h - 200;
   if (!IN.joy.active) { IN.joy.nx = IN.joy.bx; IN.joy.ny = IN.joy.by; }
 }
-layoutControls();
 
 window.addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
@@ -742,10 +639,7 @@ canvas.addEventListener("touchmove", e => {
       IN.joy.nx = t.clientX; IN.joy.ny = t.clientY;
       const dx = IN.joy.nx - IN.joy.bx, dy = IN.joy.ny - IN.joy.by;
       const d = Math.hypot(dx, dy);
-      if (d > IN.joy.r) {
-        IN.joy.nx = IN.joy.bx + dx/d * IN.joy.r;
-        IN.joy.ny = IN.joy.by + dy/d * IN.joy.r;
-      }
+      if (d > IN.joy.r) { IN.joy.nx = IN.joy.bx + dx/d * IN.joy.r; IN.joy.ny = IN.joy.by + dy/d * IN.joy.r; }
     }
   }
   e.preventDefault();
@@ -753,10 +647,7 @@ canvas.addEventListener("touchmove", e => {
 
 function endTouch(e) {
   for (const t of e.changedTouches) {
-    if (t.identifier === IN.joy.id) {
-      IN.joy.id = null; IN.joy.active = false;
-      IN.joy.nx = IN.joy.bx; IN.joy.ny = IN.joy.by;
-    }
+    if (t.identifier === IN.joy.id) { IN.joy.id = null; IN.joy.active = false; IN.joy.nx = IN.joy.bx; IN.joy.ny = IN.joy.by; }
     if (t.identifier === IN.btnA.id) { IN.btnA.id = null; IN.btnA.active = false; }
     if (t.identifier === IN.btnB.id) { IN.btnB.id = null; IN.btnB.active = false; }
     if (t.identifier === IN.btnC.id) { IN.btnC.id = null; IN.btnC.active = false; }
@@ -783,20 +674,15 @@ function getMoveVec() {
 }
 
 /* ========================================================================
-   7. PHYSICS — collision
+   6. PHYSICS & BOTS
    ======================================================================== */
 const Phys = {
-  // AABB vs world walls + pallets (upright)
   rectHitsWorld(x, y, w, h, ignorePalletId = null) {
     if (x < 0 || y < 0 || x + w > CFG.MAP_W || y + h > CFG.MAP_H) return true;
-    for (const ww of MAP.walls) {
-      if (x < ww.x + ww.w && x + w > ww.x && y < ww.y + ww.h && y + h > ww.y) return true;
-    }
+    for (const ww of MAP.walls) { if (x < ww.x + ww.w && x + w > ww.x && y < ww.y + ww.h && y + h > ww.y) return true; }
     for (const p of MAP.pallets) {
-      if (p.state !== 0) continue;  // only upright blocks
-      if (p.id === ignorePalletId) continue;
-      const pw = 14, ph = 80;
-      if (x < p.x + pw && x + w > p.x && y < p.y + ph && y + h > p.y) return true;
+      if (p.state !== 0 || p.id === ignorePalletId) continue;
+      if (x < p.x + 14 && x + w > p.x && y < p.y + 80 && y + h > p.y) return true;
     }
     return false;
   },
@@ -811,9 +697,6 @@ const Phys = {
   }
 };
 
-/* ========================================================================
-   8. BOTS — simple AI
-   ======================================================================== */
 const BOT_NAMES = ["KIRA","RIO","NOVA","ZEN","MAKO","RUBI","LYX","ONI","KAI","TAO","PIX"];
 const BOT_COLORS = ["#4de4ff","#ff8a3c","#6bff7a","#fcee0a","#c792ff","#ff6eb5","#5cffa6","#ff9d3c"];
 
@@ -822,14 +705,12 @@ function updateBots(dt) {
     const p = S.players[id];
     if (!p.isBot) continue;
 
-    // Bot AI
     if (!p.ai) p.ai = { t: 0, tx: p.x, ty: p.y, mode: "wander" };
     p.ai.t -= dt;
-
     const isGabri = id === S.gabriId;
 
     if (isGabri) {
-      // Chase nearest non-stealth non-gabri player
+      // Chase nearest
       let target = null, bestD = Infinity;
       for (const tid in S.players) {
         if (tid === id) continue;
@@ -841,42 +722,40 @@ function updateBots(dt) {
       if (target) { p.ai.tx = target.x; p.ai.ty = target.y; }
       else if (p.ai.t <= 0) { p.ai.tx = Math.random()*CFG.MAP_W; p.ai.ty = Math.random()*CFG.MAP_H; p.ai.t = 2; }
     } else {
-      // Flee Gabri or wander
+      // Flee Gabri
       const g = S.gabriId ? S.players[S.gabriId] : null;
-      if (g && Phys.dist(p, g) < 260) {
+      if (g && Phys.dist(p, g) < 280) {
         const dx = p.x - g.x, dy = p.y - g.y, d = Math.hypot(dx, dy) || 1;
-        p.ai.tx = p.x + dx/d * 300;
-        p.ai.ty = p.y + dy/d * 300;
+        p.ai.tx = p.x + dx/d * 300; p.ai.ty = p.y + dy/d * 300;
       } else if (p.ai.t <= 0) {
-        p.ai.tx = 100 + Math.random() * (CFG.MAP_W - 200);
-        p.ai.ty = 100 + Math.random() * (CFG.MAP_H - 200);
-        p.ai.t = 2 + Math.random() * 3;
+        p.ai.tx = 100 + Math.random() * (CFG.MAP_W - 200); p.ai.ty = 100 + Math.random() * (CFG.MAP_H - 200); p.ai.t = 1 + Math.random() * 2;
       }
     }
 
-    const dx = p.ai.tx - p.x, dy = p.ai.ty - p.y, d = Math.hypot(dx, dy);
+    let dx = p.ai.tx - p.x, dy = p.ai.ty - p.y, d = Math.hypot(dx, dy);
     if (d > 4) {
-      const ndx = dx / d, ndy = dy / d;
+      let ndx = dx / d, ndy = dy / d;
+      // Collision avoidance (Simple feeler)
+      if (Phys.rectHitsWorld(p.x + ndx * 20, p.y + ndy * 20, CFG.P_SIZE, CFG.P_SIZE)) {
+        const angle = Math.atan2(ndy, ndx) + Math.PI / 4; // steer right
+        ndx = Math.cos(angle); ndy = Math.sin(angle);
+      }
       p.inputDx = ndx; p.inputDy = ndy;
       p.facing.x = ndx; p.facing.y = ndy;
     } else {
       p.inputDx = 0; p.inputDy = 0;
     }
 
-    // Random dash for gabri bot
-    if (isGabri && p.dashCd <= 0 && Math.random() < 0.01) {
-      p.dashT = CFG.DASH_DUR; p.dashCd = CFG.DASH_CD;
-    }
+    if (isGabri && p.dashCd <= 0 && Math.random() < 0.01) { p.dashT = CFG.DASH_DUR; p.dashCd = CFG.DASH_CD; }
   }
 }
 
 /* ========================================================================
-   9. GAME ACTIONS
+   7. GAME ACTIONS & BOSS
    ======================================================================== */
 function doDash(p) {
   if (p.dashCd > 0) return;
-  p.dashT = CFG.DASH_DUR;
-  p.dashCd = CFG.DASH_CD;
+  p.dashT = CFG.DASH_DUR; p.dashCd = CFG.DASH_CD;
   Phys.spawnParticles(p.x + CFG.P_SIZE/2, p.y + CFG.P_SIZE/2, COL.cool, 10);
   sfx.dash();
 }
@@ -884,66 +763,48 @@ function doDash(p) {
 function doAction(p) {
   const cx = p.x + CFG.P_SIZE/2, cy = p.y + CFG.P_SIZE/2;
 
-  // 1) Pallet interact
+  // 1) Pallet
   for (const pallet of MAP.pallets) {
     const pcx = pallet.x + 40, pcy = pallet.y + 40;
     if (Math.hypot(cx - pcx, cy - pcy) < 70) {
       if (pallet.state === 0 && pallet.cd <= 0) {
-        // Drop it
-        pallet.state = 1;
-        pallet.cd = 0.3;
-        Phys.spawnParticles(pallet.x + 40, pallet.y + 40, COL.warm, 20);
-        sfx.pallet();
-        flashBanner("PALETTE FÄLLT!");
+        pallet.state = 1; pallet.cd = 0.3;
+        Phys.spawnParticles(pallet.x + 40, pallet.y + 40, COL.warm, 20); sfx.pallet(); flashBanner("PALETTE FÄLLT!"); S.screenShake = 15;
         return;
       }
       if (pallet.state === 1 && pallet.cd <= 0) {
-        // Vault over (only if gabri or explicit)
-        const isGabri = p === S.players[S.gabriId];
-        if (isGabri) {
-          // Gabri breaks it
-          pallet.state = 2; // destroyed
-          pallet.cd = 1.0;
-          Phys.spawnParticles(pallet.x + 40, pallet.y + 40, COL.danger, 20);
-          sfx.pallet();
+        if (p === S.players[S.gabriId]) {
+          pallet.state = 2; pallet.cd = 1.0;
+          Phys.spawnParticles(pallet.x + 40, pallet.y + 40, COL.danger, 20); sfx.pallet(); S.screenShake = 10;
           return;
         }
       }
     }
   }
 
-  // 2) Basketball - pick up / shoot
+  // 2) Basketball
   if (p.heldItem === "ball") {
-    // Shoot
-    p.heldItem = null;
-    S.ball.owner = null;
-    S.ball.x = cx + p.facing.x * 30;
-    S.ball.y = cy + p.facing.y * 30;
-    S.ball.vx = p.facing.x * 900;
-    S.ball.vy = p.facing.y * 900;
-    S.ball.vz = 420;
-    S.ball.z = 30;
+    p.heldItem = null; S.ball.owner = null;
+    S.ball.x = cx + p.facing.x * 30; S.ball.y = cy + p.facing.y * 30;
+    S.ball.vx = p.facing.x * 900; S.ball.vy = p.facing.y * 900;
+    S.ball.vz = 420; S.ball.z = 30;
     sfx.tone(400, "sine", 0.1, 0.5, 600);
     return;
   }
 
-  // 3) MG - shoot
+  // 3) MG
   if (p.heldItem === "mg") {
     if (Date.now() - S.lastMgFire < 120) return;
-    S.lastMgFire = Date.now();
-    fireMG(p);
+    S.lastMgFire = Date.now(); fireMG(p);
     return;
   }
 
-  // 4) Sword - swing
+  // 4) Sword
   if (p.heldItem === "sword") {
-    p.swingT = 0.25;
-    sfx.hit();
-    // Hit boss?
+    p.swingT = 0.25; sfx.hit();
     if (S.boss && S.boss.active) {
       if (Math.hypot(cx + p.facing.x * 40 - (S.boss.x + 40), cy + p.facing.y * 40 - (S.boss.y + 40)) < 70) {
-        S.boss.hp -= 1;
-        Phys.spawnParticles(S.boss.x + 40, S.boss.y + 40, COL.danger, 12);
+        S.boss.hp -= 1; Phys.spawnParticles(S.boss.x + 40, S.boss.y + 40, COL.danger, 12); S.screenShake = 10;
         flashBanner(`ISHIN: ${S.boss.hp}/${CFG.BOSS_HP}`);
         if (S.boss.hp <= 0) defeatBoss();
       }
@@ -951,33 +812,12 @@ function doAction(p) {
     return;
   }
 
-  // 5) Pick up ball
-  if (!S.ball.owner && S.ball.active && Math.hypot(cx - S.ball.x, cy - S.ball.y) < 50 && S.ball.z < 20) {
-    p.heldItem = "ball";
-    S.ball.owner = p.id;
-    sfx.pickup();
-    return;
-  }
-
-  // 6) Pick up MG
-  if (S.mg && !S.mg.owner && Math.hypot(cx - S.mg.x, cy - S.mg.y) < 50) {
-    p.heldItem = "mg";
-    S.mg.owner = p.id;
-    sfx.pickup();
-    flashBanner("MG AUFGENOMMEN!");
-    return;
-  }
-
-  // 7) Pick up sword (from boss drops)
+  // 5) Pickups
+  if (!S.ball.owner && S.ball.active && Math.hypot(cx - S.ball.x, cy - S.ball.y) < 50 && S.ball.z < 20) { p.heldItem = "ball"; S.ball.owner = p.id; sfx.pickup(); return; }
+  if (S.mg && !S.mg.owner && Math.hypot(cx - S.mg.x, cy - S.mg.y) < 50) { p.heldItem = "mg"; S.mg.owner = p.id; sfx.pickup(); flashBanner("MG AUFGENOMMEN!"); return; }
   if (S.swords) {
-    for (let i = 0; i < S.swords.length; i++) {
-      const sw = S.swords[i];
-      if (!sw.owner && Math.hypot(cx - sw.x, cy - sw.y) < 50) {
-        p.heldItem = "sword";
-        sw.owner = p.id;
-        sfx.pickup();
-        return;
-      }
+    for (let sw of S.swords) {
+      if (!sw.owner && Math.hypot(cx - sw.x, cy - sw.y) < 50) { p.heldItem = "sword"; sw.owner = p.id; sfx.pickup(); return; }
     }
   }
 }
@@ -987,205 +827,126 @@ function doDrop(p) {
   const cx = p.x + CFG.P_SIZE/2, cy = p.y + CFG.P_SIZE/2;
   if (p.heldItem === "ball") { S.ball.owner = null; S.ball.x = cx; S.ball.y = cy; S.ball.vx = 0; S.ball.vy = 0; S.ball.z = 0; }
   if (p.heldItem === "mg")   { S.mg.owner = null;   S.mg.x = cx;   S.mg.y = cy; }
-  if (p.heldItem === "sword" && S.swords) {
-    const sw = S.swords.find(s => s.owner === p.id);
-    if (sw) { sw.owner = null; sw.x = cx; sw.y = cy; }
-  }
-  p.heldItem = null;
-  sfx.drop();
+  if (p.heldItem === "sword" && S.swords) { const sw = S.swords.find(s => s.owner === p.id); if (sw) { sw.owner = null; sw.x = cx; sw.y = cy; } }
+  p.heldItem = null; sfx.drop();
 }
 
 function fireMG(p) {
   const cx = p.x + CFG.P_SIZE/2, cy = p.y + CFG.P_SIZE/2;
-  let lx = cx, ly = cy;
-  let hit = null;
+  let lx = cx, ly = cy, hit = null;
   const step = 24, maxSteps = 40;
   for (let i = 0; i < maxSteps; i++) {
-    lx += p.facing.x * step;
-    ly += p.facing.y * step;
+    lx += p.facing.x * step; ly += p.facing.y * step;
     if (Phys.rectHitsWorld(lx - 4, ly - 4, 8, 8)) break;
-    // Boss hit
-    if (S.boss && S.boss.active) {
-      if (Math.hypot(lx - (S.boss.x + 40), ly - (S.boss.y + 40)) < 45) {
-        S.boss.hp -= 1;
-        hit = "boss";
-        break;
-      }
-    }
+    if (S.boss && S.boss.active && Math.hypot(lx - (S.boss.x + 40), ly - (S.boss.y + 40)) < 45) { S.boss.hp -= 1; hit = "boss"; break; }
   }
   S.lastLaser = { x1: cx, y1: cy, x2: lx, y2: ly, t: 0.1 };
-  sfx.shoot();
+  sfx.shoot(); S.screenShake = 5;
   if (hit === "boss") {
-    Phys.spawnParticles(S.boss.x + 40, S.boss.y + 40, COL.warm, 8);
-    flashBanner(`ISHIN: ${S.boss.hp}/${CFG.BOSS_HP}`);
+    Phys.spawnParticles(S.boss.x + 40, S.boss.y + 40, COL.warm, 8); flashBanner(`ISHIN: ${S.boss.hp}/${CFG.BOSS_HP}`);
     if (S.boss.hp <= 0) defeatBoss();
   }
 }
 
-/* ========================================================================
-   10. BOSS — ISHIN
-   ======================================================================== */
 function spawnBoss() {
   if (S.boss) return;
-  S.boss = {
-    x: MAP.bossArea.x, y: MAP.bossArea.y,
-    tx: MAP.bossArea.x, ty: MAP.bossArea.y,
-    hp: CFG.BOSS_HP, active: true, atkCd: 0
-  };
-  S.swords = S.swords || [];
-  // Drop 2 swords near boss
-  S.swords.push({ x: S.boss.x - 40, y: S.boss.y + 100, owner: null });
-  S.swords.push({ x: S.boss.x + 120, y: S.boss.y + 100, owner: null });
-
-  sfx.bossIn();
-  flashBanner("⚠ ISHIN ERSCHEINT ⚠", 2500);
+  S.boss = { x: MAP.bossArea.x, y: MAP.bossArea.y, hp: CFG.BOSS_HP, active: true, atkCd: 0 };
+  S.swords = [{ x: S.boss.x - 40, y: S.boss.y + 100, owner: null }, { x: S.boss.x + 120, y: S.boss.y + 100, owner: null }];
+  sfx.bossIn(); S.screenShake = 30; flashBanner("⚠ ISHIN ERSCHEINT ⚠", 2500);
   Phys.spawnParticles(S.boss.x + 40, S.boss.y + 40, COL.danger, 40);
 }
 
 function updateBoss(dt) {
   if (!S.boss || !S.boss.active) return;
-  // Chase nearest player
   let tgt = null, bestD = Infinity;
   for (const id in S.players) {
     const p = S.players[id];
     const d = Phys.dist({ x: S.boss.x, y: S.boss.y }, p);
-    if (d < bestD) { bestD = d; tgt = p; }
+    if (d < bestD && !p.isStealth) { bestD = d; tgt = p; }
   }
   if (tgt) {
-    const dx = (tgt.x + CFG.P_SIZE/2) - (S.boss.x + 40);
-    const dy = (tgt.y + CFG.P_SIZE/2) - (S.boss.y + 40);
-    const d = Math.hypot(dx, dy) || 1;
-    S.boss.x += dx/d * 80 * dt;
-    S.boss.y += dy/d * 80 * dt;
+    const dx = (tgt.x + CFG.P_SIZE/2) - (S.boss.x + 40), dy = (tgt.y + CFG.P_SIZE/2) - (S.boss.y + 40), d = Math.hypot(dx, dy) || 1;
+    S.boss.x += dx/d * 80 * dt; S.boss.y += dy/d * 80 * dt;
   }
-  // Knockback on contact
   S.boss.atkCd -= dt;
   for (const id in S.players) {
     const p = S.players[id];
     if (Math.hypot((p.x + CFG.P_SIZE/2) - (S.boss.x + 40), (p.y + CFG.P_SIZE/2) - (S.boss.y + 40)) < 60) {
       if (S.boss.atkCd <= 0 && !p.isStealth) {
         const ang = Math.atan2(p.y - S.boss.y, p.x - S.boss.x);
-        p.kbvx = Math.cos(ang) * 700;
-        p.kbvy = Math.sin(ang) * 700;
-        S.boss.atkCd = 0.5;
-        Phys.spawnParticles(p.x + CFG.P_SIZE/2, p.y + CFG.P_SIZE/2, COL.danger, 10);
-        sfx.hit();
+        p.kbvx = Math.cos(ang) * 700; p.kbvy = Math.sin(ang) * 700;
+        S.boss.atkCd = 0.5; Phys.spawnParticles(p.x + CFG.P_SIZE/2, p.y + CFG.P_SIZE/2, COL.danger, 10); sfx.hit(); S.screenShake = 15;
       }
     }
   }
 }
-
 function defeatBoss() {
-  S.boss.active = false;
-  // Drop MG
-  S.mg = { x: S.boss.x + 40, y: S.boss.y + 40, owner: null };
-  Phys.spawnParticles(S.boss.x + 40, S.boss.y + 40, COL.accent, 60);
-  flashBanner("ISHIN BESIEGT! MG GEDROPPT!", 3000);
-  sfx.score();
+  S.boss.active = false; S.mg = { x: S.boss.x + 40, y: S.boss.y + 40, owner: null };
+  Phys.spawnParticles(S.boss.x + 40, S.boss.y + 40, COL.accent, 60); flashBanner("ISHIN BESIEGT! MG GEDROPPT!", 3000); sfx.score();
 }
 
 /* ========================================================================
-   11. UPDATE LOOP
+   8. UPDATE LOOP
    ======================================================================== */
 function update(dt) {
-  const now = performance.now();
   S.cheerDance += dt;
+  if (S.screenShake > 0) S.screenShake -= dt * 60;
 
-  // Timer (host only)
-  if (S.running && S.isHost) {
+  if (S.running) {
     S.timeLeft -= dt;
     if (S.timeLeft <= 0) { endRound(); return; }
-    // Boss trigger
-    if (S.timeLeft <= CFG.BOSS_START && !S.boss) {
-      spawnBoss();
-    }
+    if (S.timeLeft <= CFG.BOSS_START && !S.boss) spawnBoss();
   }
 
-  // Pallet cooldowns
-  for (const p of MAP.pallets) {
-    if (p.cd > 0) p.cd -= dt;
-  }
+  for (const p of MAP.pallets) { if (p.cd > 0) p.cd -= dt; }
 
-  // Input → my player
   const me = S.players[S.myId];
-  if (me) {
-    // Consume edge-triggered buttons
+  if (me && S.running) {
     if (IN.btnA.justPressed) { IN.btnA.justPressed = false; doAction(me); }
     if (IN.btnB.justPressed) { IN.btnB.justPressed = false; doDash(me); }
     if (IN.btnC.justPressed) { IN.btnC.justPressed = false; doDrop(me); }
-
     const v = getMoveVec();
     me.inputDx = v.dx; me.inputDy = v.dy;
-    if (v.mag > 0.15) {
-      const L = Math.hypot(v.dx, v.dy) || 1;
-      me.facing.x = v.dx / L; me.facing.y = v.dy / L;
-    }
+    if (v.mag > 0.15) { const L = Math.hypot(v.dx, v.dy) || 1; me.facing.x = v.dx / L; me.facing.y = v.dy / L; }
   }
 
-  // Bots
-  if (S.mode === "solo" && S.running) updateBots(dt);
+  if (S.running) updateBots(dt);
 
-  // Move all players
   for (const id in S.players) {
     const p = S.players[id];
-
-    // Dash
     if (p.dashT > 0) p.dashT -= dt;
     if (p.dashCd > 0) p.dashCd -= dt;
     if (p.tagCd > 0) p.tagCd -= dt;
+    if (p.swingT > 0) p.swingT -= dt;
 
-    // Stealth
     const moving = Math.hypot(p.inputDx||0, p.inputDy||0) > 0.15;
-    if (!moving) { p.stillT += dt; }
-    else { p.stillT = 0; }
+    if (!moving) p.stillT += dt; else p.stillT = 0;
     p.isStealth = p.stillT > CFG.STEALTH_TIME;
 
     let sp = CFG.BASE_SPEED;
     if (p.dashT > 0) sp *= CFG.DASH_MULT;
 
-    let mvx = (p.inputDx || 0) * sp;
-    let mvy = (p.inputDy || 0) * sp;
-
-    // Knockback
-    p.kbvx = (p.kbvx || 0) * 0.88;
-    p.kbvy = (p.kbvy || 0) * 0.88;
-    mvx += p.kbvx;
-    mvy += p.kbvy;
+    let mvx = (p.inputDx || 0) * sp, mvy = (p.inputDy || 0) * sp;
+    p.kbvx = (p.kbvx || 0) * 0.88; p.kbvy = (p.kbvy || 0) * 0.88;
+    mvx += p.kbvx; mvy += p.kbvy;
 
     const dx = mvx * dt, dy = mvy * dt;
-    // Move X
-    if (!Phys.rectHitsWorld(p.x + dx, p.y, CFG.P_SIZE, CFG.P_SIZE)) p.x += dx;
-    else p.kbvx = 0;
-    // Move Y
-    if (!Phys.rectHitsWorld(p.x, p.y + dy, CFG.P_SIZE, CFG.P_SIZE)) p.y += dy;
-    else p.kbvy = 0;
-
-    // Swing timer
-    if (p.swingT > 0) p.swingT -= dt;
+    if (!Phys.rectHitsWorld(p.x + dx, p.y, CFG.P_SIZE, CFG.P_SIZE)) p.x += dx; else p.kbvx = 0;
+    if (!Phys.rectHitsWorld(p.x, p.y + dy, CFG.P_SIZE, CFG.P_SIZE)) p.y += dy; else p.kbvy = 0;
   }
 
-  // Gabri time accumulator
-  if (S.running && S.gabriId && S.players[S.gabriId]) {
-    S.players[S.gabriId].timeAsGabri += dt;
-  }
+  if (S.running && S.gabriId && S.players[S.gabriId]) S.players[S.gabriId].timeAsGabri += dt;
 
-  // TAG LOGIC — gabri touches someone else
   if (S.running && S.gabriId) {
     const g = S.players[S.gabriId];
     if (g && g.tagCd <= 0) {
       for (const id in S.players) {
         if (id === S.gabriId) continue;
         const p = S.players[id];
-        if (p.isStealth) continue;
-        if (p.tagCd > 0) continue;
+        if (p.isStealth || p.tagCd > 0) continue;
         if (Phys.dist(g, p) < CFG.P_SIZE * 0.9) {
-          // Switch
-          const oldId = S.gabriId;
-          S.gabriId = id;
-          p.tagCd = CFG.TAG_COOLDOWN / 1000;
-          g.tagCd = CFG.TAG_COOLDOWN / 1000;
-          Phys.spawnParticles(p.x + CFG.P_SIZE/2, p.y + CFG.P_SIZE/2, COL.danger, 25);
-          sfx.tag();
+          S.gabriId = id; p.tagCd = CFG.TAG_COOLDOWN / 1000; g.tagCd = CFG.TAG_COOLDOWN / 1000;
+          Phys.spawnParticles(p.x + CFG.P_SIZE/2, p.y + CFG.P_SIZE/2, COL.danger, 25); sfx.tag(); S.screenShake = 12;
           flashBanner(`${p.name} IST JETZT GABRI!`);
           break;
         }
@@ -1193,882 +954,383 @@ function update(dt) {
     }
   }
 
-  // Ball physics
   if (S.ball.active && !S.ball.owner) {
-    const nx = S.ball.x + S.ball.vx * dt;
-    const ny = S.ball.y + S.ball.vy * dt;
-    if (Phys.rectHitsWorld(nx - 6, S.ball.y - 6, 12, 12)) { S.ball.vx *= -0.6; sfx.bounce(); }
-    else S.ball.x = nx;
-    if (Phys.rectHitsWorld(S.ball.x - 6, ny - 6, 12, 12)) { S.ball.vy *= -0.6; sfx.bounce(); }
-    else S.ball.y = ny;
+    const nx = S.ball.x + S.ball.vx * dt, ny = S.ball.y + S.ball.vy * dt;
+    if (Phys.rectHitsWorld(nx - 6, S.ball.y - 6, 12, 12)) { S.ball.vx *= -0.6; sfx.bounce(); } else S.ball.x = nx;
+    if (Phys.rectHitsWorld(S.ball.x - 6, ny - 6, 12, 12)) { S.ball.vy *= -0.6; sfx.bounce(); } else S.ball.y = ny;
     S.ball.vx *= 0.985; S.ball.vy *= 0.985;
-
-    // Z (vertical)
-    S.ball.vz -= 800 * dt;
-    S.ball.z += S.ball.vz * dt;
-    if (S.ball.z < 0) {
-      S.ball.z = 0;
-      if (S.ball.vz < -40) { S.ball.vz *= -0.55; sfx.bounce(); }
-      else { S.ball.vz = 0; S.ball.vx *= 0.9; S.ball.vy *= 0.9; }
-    }
-
-    // Hoop scoring
+    S.ball.vz -= 800 * dt; S.ball.z += S.ball.vz * dt;
+    if (S.ball.z < 0) { S.ball.z = 0; if (S.ball.vz < -40) { S.ball.vz *= -0.55; sfx.bounce(); } else { S.ball.vz = 0; S.ball.vx *= 0.9; S.ball.vy *= 0.9; } }
     for (const h of MAP.hoops) {
-      if (S.ball.z > 50 && Math.hypot(S.ball.x - h.x, S.ball.y - h.y) < 28) {
-        if (!S.ball.scoring) {
-          S.ball.scoring = true;
-          S.cheerDance = 0;
-          S.scored = (S.scored || 0) + 1;
-          sfx.score();
-          flashBanner("BASKET! CHEERLEADER TANZEN!", 1800);
-          Phys.spawnParticles(h.x, h.y, COL.accent, 40);
-          setTimeout(() => { S.ball.scoring = false; }, 1000);
-        }
+      if (S.ball.z > 50 && Math.hypot(S.ball.x - h.x, S.ball.y - h.y) < 28 && !S.ball.scoring) {
+        S.ball.scoring = true; S.cheerDance = 0; sfx.score(); flashBanner("BASKET! CHEERLEADER TANZEN!", 1800);
+        Phys.spawnParticles(h.x, h.y, COL.accent, 40);
+        setTimeout(() => { S.ball.scoring = false; }, 1000);
       }
     }
   } else if (S.ball.owner && S.players[S.ball.owner]) {
-    const o = S.players[S.ball.owner];
-    S.ball.x = o.x + CFG.P_SIZE/2;
-    S.ball.y = o.y - 10;
-    S.ball.z = 10;
+    const o = S.players[S.ball.owner]; S.ball.x = o.x + CFG.P_SIZE/2; S.ball.y = o.y - 10; S.ball.z = 10;
   }
 
-  // Boss
-  if (S.isHost) updateBoss(dt);
-
-  // Laser fade
+  updateBoss(dt);
   if (S.lastLaser) { S.lastLaser.t -= dt; if (S.lastLaser.t <= 0) S.lastLaser = null; }
 
-  // Particles
   for (let i = S.particles.length - 1; i >= 0; i--) {
-    const pt = S.particles[i];
-    pt.x += pt.vx * dt; pt.y += pt.vy * dt;
-    pt.vx *= 0.94; pt.vy *= 0.94;
-    pt.life -= dt;
+    const pt = S.particles[i]; pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vx *= 0.94; pt.vy *= 0.94; pt.life -= dt;
     if (pt.life <= 0) S.particles.splice(i, 1);
   }
 
-  // Camera
   if (me) {
-    const tx = me.x + CFG.P_SIZE/2 - canvas.width/2;
-    const ty = me.y + CFG.P_SIZE/2 - canvas.height/2;
-    S.cam.x += (tx - S.cam.x) * Math.min(1, 8 * dt);
-    S.cam.y += (ty - S.cam.y) * Math.min(1, 8 * dt);
-    S.cam.x = Math.max(0, Math.min(S.cam.x, CFG.MAP_W - canvas.width));
-    S.cam.y = Math.max(0, Math.min(S.cam.y, CFG.MAP_H - canvas.height));
-  }
-
-  // Firebase sync
-  if (fb && S.mode !== "solo" && S.running && me && now - S.lastSync > 90) {
-    S.lastSync = now;
-    syncPlayerPos(me);
+    const tx = me.x + CFG.P_SIZE/2 - canvas.width/2, ty = me.y + CFG.P_SIZE/2 - canvas.height/2;
+    S.cam.x += (tx - S.cam.x) * Math.min(1, 8 * dt); S.cam.y += (ty - S.cam.y) * Math.min(1, 8 * dt);
+    S.cam.x = Math.max(0, Math.min(S.cam.x, CFG.MAP_W - canvas.width)); S.cam.y = Math.max(0, Math.min(S.cam.y, CFG.MAP_H - canvas.height));
   }
 }
 
 /* ========================================================================
-   12. RENDERING
+   9. RENDERING
    ======================================================================== */
 function draw() {
   ctx.save();
-  // BG
-  ctx.fillStyle = COL.bgDeep;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = COL.bgDeep; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.translate(-S.cam.x, -S.cam.y);
+  let camX = S.cam.x, camY = S.cam.y;
+  if (S.screenShake > 0) { camX += (Math.random()-0.5)*S.screenShake; camY += (Math.random()-0.5)*S.screenShake; }
+  ctx.translate(-camX, -camY);
 
-  // Visible region
-  const visL = S.cam.x - 50, visR = S.cam.x + canvas.width + 50;
-  const visT = S.cam.y - 50, visB = S.cam.y + canvas.height + 50;
+  const visL = camX - 50, visR = camX + canvas.width + 50, visT = camY - 50, visB = camY + canvas.height + 50;
+  ctx.fillStyle = COL.bg; ctx.fillRect(0, 0, CFG.MAP_W, CFG.MAP_H);
 
-  // Floor + grid
-  ctx.fillStyle = COL.bg;
-  ctx.fillRect(0, 0, CFG.MAP_W, CFG.MAP_H);
-
-  // Rooms (backgrounds)
   for (const r of MAP.rooms) {
     if (r.x > visR || r.x + r.w < visL || r.y > visB || r.y + r.h < visT) continue;
     ctx.fillStyle = r.color;
-    if (r.circle) {
-      ctx.beginPath();
-      ctx.arc(r.x + r.w/2, r.y + r.h/2, r.w/2, 0, Math.PI*2);
-      ctx.fill();
-    } else {
-      ctx.fillRect(r.x, r.y, r.w, r.h);
-    }
+    if (r.circle) { ctx.beginPath(); ctx.arc(r.x + r.w/2, r.y + r.h/2, r.w/2, 0, Math.PI*2); ctx.fill(); }
+    else ctx.fillRect(r.x, r.y, r.w, r.h);
   }
 
-  // Grid on floor
-  ctx.strokeStyle = COL.grid;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
+  ctx.strokeStyle = COL.grid; ctx.lineWidth = 1; ctx.beginPath();
   const gs = 80;
-  for (let x = Math.floor(S.cam.x / gs) * gs; x < visR; x += gs) {
-    ctx.moveTo(x, visT); ctx.lineTo(x, visB);
-  }
-  for (let y = Math.floor(S.cam.y / gs) * gs; y < visB; y += gs) {
-    ctx.moveTo(visL, y); ctx.lineTo(visR, y);
-  }
+  for (let x = Math.floor(camX / gs) * gs; x < visR; x += gs) { ctx.moveTo(x, visT); ctx.lineTo(x, visB); }
+  for (let y = Math.floor(camY / gs) * gs; y < visB; y += gs) { ctx.moveTo(visL, y); ctx.lineTo(visR, y); }
   ctx.stroke();
 
-  // Room labels
   for (const r of MAP.rooms) {
-    if (!r.label) continue;
-    if (r.x > visR || r.x + r.w < visL || r.y > visB || r.y + r.h < visT) continue;
-    ctx.fillStyle = "rgba(252,238,10,0.18)";
-    ctx.font = "bold 22px 'Rubik Mono One', monospace";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(r.label, r.x + r.w/2, r.y + 40);
+    if (!r.label || r.x > visR || r.x + r.w < visL || r.y > visB || r.y + r.h < visT) continue;
+    ctx.fillStyle = "rgba(252,238,10,0.18)"; ctx.font = "bold 22px 'Rubik Mono One', monospace";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(r.label, r.x + r.w/2, r.y + 40);
   }
 
-  // Basketball hoops
   for (const h of MAP.hoops) {
-    // Backboard
-    ctx.fillStyle = "#ffffff";
-    if (h.side === "L") ctx.fillRect(h.x - 6, h.y - 36, 6, 60);
-    else ctx.fillRect(h.x, h.y - 36, 6, 60);
-    // Rim
-    ctx.strokeStyle = COL.warm;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(h.x, h.y, 20, 0, Math.PI * 2);
-    ctx.stroke();
-    // Net
-    ctx.strokeStyle = "rgba(255,255,255,0.6)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 0; i < 8; i++) {
-      const a = (i/8) * Math.PI * 2;
-      ctx.moveTo(h.x + Math.cos(a) * 20, h.y + Math.sin(a) * 20);
-      ctx.lineTo(h.x + Math.cos(a) * 8, h.y + 22);
-    }
+    ctx.fillStyle = "#ffffff"; if (h.side === "L") ctx.fillRect(h.x - 6, h.y - 36, 6, 60); else ctx.fillRect(h.x, h.y - 36, 6, 60);
+    ctx.strokeStyle = COL.warm; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(h.x, h.y, 20, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.lineWidth = 1; ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const a = (i/8) * Math.PI * 2; ctx.moveTo(h.x + Math.cos(a) * 20, h.y + Math.sin(a) * 20); ctx.lineTo(h.x + Math.cos(a) * 8, h.y + 22); }
     ctx.stroke();
   }
 
-  // Cheerleaders (NPCs in gym) — dance after score
   drawCheerleaders();
 
-  // Walls
   for (const w of MAP.walls) {
     if (w.x > visR || w.x + w.w < visL || w.y > visB || w.y + w.h < visT) continue;
-    if (w.pillar) {
-      ctx.fillStyle = COL.wall;
-      ctx.fillRect(w.x, w.y, w.w, w.h);
-      ctx.strokeStyle = COL.accent;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(w.x + 2, w.y + 2, w.w - 4, w.h - 4);
-    } else {
-      ctx.fillStyle = COL.wall;
-      ctx.fillRect(w.x, w.y, w.w, w.h);
-      ctx.strokeStyle = COL.wallEdge;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(w.x + 0.5, w.y + 0.5, w.w - 1, w.h - 1);
-    }
+    ctx.fillStyle = COL.wall; ctx.fillRect(w.x, w.y, w.w, w.h);
+    if (w.pillar) { ctx.strokeStyle = COL.accent; ctx.lineWidth = 2; ctx.strokeRect(w.x + 2, w.y + 2, w.w - 4, w.h - 4); }
+    else { ctx.strokeStyle = COL.wallEdge; ctx.lineWidth = 1; ctx.strokeRect(w.x + 0.5, w.y + 0.5, w.w - 1, w.h - 1); }
   }
 
-  // Pallets
   for (const p of MAP.pallets) {
     if (p.x > visR || p.y > visB || p.x + 80 < visL || p.y + 80 < visT) continue;
     if (p.state === 0) {
-      // Upright — tall slim
-      ctx.fillStyle = "#6b4a2a";
-      ctx.fillRect(p.x, p.y, 14, 80);
-      ctx.fillStyle = "#8a6438";
-      ctx.fillRect(p.x + 2, p.y, 10, 80);
-      // Marks
-      ctx.fillStyle = "#3d2a18";
-      for (let i = 0; i < 4; i++) ctx.fillRect(p.x + 2, p.y + 4 + i * 20, 10, 2);
+      ctx.fillStyle = "#6b4a2a"; ctx.fillRect(p.x, p.y, 14, 80); ctx.fillStyle = "#8a6438"; ctx.fillRect(p.x + 2, p.y, 10, 80);
+      ctx.fillStyle = "#3d2a18"; for (let i = 0; i < 4; i++) ctx.fillRect(p.x + 2, p.y + 4 + i * 20, 10, 2);
     } else if (p.state === 1) {
-      // Fallen — flat strip
-      ctx.fillStyle = "#5a3e22";
-      ctx.fillRect(p.x - 30, p.y + 30, 80, 20);
-      ctx.fillStyle = "#7a5632";
-      ctx.fillRect(p.x - 30, p.y + 32, 80, 16);
+      ctx.fillStyle = "#5a3e22"; ctx.fillRect(p.x - 30, p.y + 30, 80, 20); ctx.fillStyle = "#7a5632"; ctx.fillRect(p.x - 30, p.y + 32, 80, 16);
     } else {
-      // Destroyed debris
-      ctx.fillStyle = "#3d2a18";
-      ctx.fillRect(p.x - 20, p.y + 60, 20, 6);
-      ctx.fillRect(p.x + 5, p.y + 40, 30, 4);
+      ctx.fillStyle = "#3d2a18"; ctx.fillRect(p.x - 20, p.y + 60, 20, 6); ctx.fillRect(p.x + 5, p.y + 40, 30, 4);
     }
   }
 
-  // MG pickup
   if (S.mg && !S.mg.owner) {
-    ctx.save();
-    ctx.translate(S.mg.x, S.mg.y);
-    ctx.rotate(Math.sin(performance.now() / 300) * 0.1);
-    ctx.fillStyle = "#222";
-    ctx.fillRect(-20, -5, 40, 10);
-    ctx.fillStyle = COL.accent;
-    ctx.fillRect(-5, -12, 10, 7);
+    ctx.save(); ctx.translate(S.mg.x, S.mg.y); ctx.rotate(Math.sin(performance.now() / 300) * 0.1);
+    ctx.fillStyle = "#222"; ctx.fillRect(-20, -5, 40, 10); ctx.fillStyle = COL.accent; ctx.fillRect(-5, -12, 10, 7);
     ctx.restore();
-    // Glow
-    ctx.fillStyle = "rgba(252,238,10,0.2)";
-    ctx.beginPath();
-    ctx.arc(S.mg.x, S.mg.y, 24 + Math.sin(performance.now()/200) * 4, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = "rgba(252,238,10,0.2)"; ctx.beginPath(); ctx.arc(S.mg.x, S.mg.y, 24 + Math.sin(performance.now()/200) * 4, 0, Math.PI * 2); ctx.fill();
   }
 
-  // Swords
   if (S.swords) {
     for (const sw of S.swords) {
       if (sw.owner) continue;
-      ctx.save();
-      ctx.translate(sw.x, sw.y);
-      ctx.rotate(-Math.PI / 4);
-      ctx.fillStyle = "#cfcfe0";
-      ctx.fillRect(-2, -20, 4, 30);
-      ctx.fillStyle = COL.accent;
-      ctx.fillRect(-6, 10, 12, 4);
+      ctx.save(); ctx.translate(sw.x, sw.y); ctx.rotate(-Math.PI / 4);
+      ctx.fillStyle = "#cfcfe0"; ctx.fillRect(-2, -20, 4, 30); ctx.fillStyle = COL.accent; ctx.fillRect(-6, 10, 12, 4);
       ctx.restore();
     }
   }
 
-  // Ball
   if (S.ball.active) {
     const bx = S.ball.x, by = S.ball.y - S.ball.z;
-    // Shadow
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
-    ctx.beginPath();
-    ctx.ellipse(S.ball.x, S.ball.y + 2, 8 - S.ball.z * 0.02, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Ball
-    ctx.fillStyle = COL.warm;
-    ctx.beginPath(); ctx.arc(bx, by, 10, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "#000"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(bx, by, 10, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(bx - 10, by); ctx.lineTo(bx + 10, by);
-    ctx.moveTo(bx, by - 10); ctx.lineTo(bx, by + 10); ctx.stroke();
+    ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.beginPath(); ctx.ellipse(S.ball.x, S.ball.y + 2, 8 - S.ball.z * 0.02, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = COL.warm; ctx.beginPath(); ctx.arc(bx, by, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#000"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(bx, by, 10, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bx - 10, by); ctx.lineTo(bx + 10, by); ctx.moveTo(bx, by - 10); ctx.lineTo(bx, by + 10); ctx.stroke();
   }
 
-  // Laser
   if (S.lastLaser) {
     const a = S.lastLaser.t / 0.1;
-    ctx.strokeStyle = `rgba(252, 238, 10, ${a})`;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(S.lastLaser.x1, S.lastLaser.y1);
-    ctx.lineTo(S.lastLaser.x2, S.lastLaser.y2);
-    ctx.stroke();
+    ctx.strokeStyle = `rgba(252, 238, 10, ${a})`; ctx.lineWidth = 4; ctx.beginPath();
+    ctx.moveTo(S.lastLaser.x1, S.lastLaser.y1); ctx.lineTo(S.lastLaser.x2, S.lastLaser.y2); ctx.stroke();
     ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
   }
 
-  // Boss
-  if (S.boss && S.boss.active) {
-    drawBoss();
-  }
+  if (S.boss && S.boss.active) drawBoss();
 
-  // Players (sort by y for depth)
   const plist = Object.values(S.players).sort((a, b) => a.y - b.y);
-  for (const p of plist) {
-    drawPlayer(p);
-  }
+  for (const p of plist) drawPlayer(p);
 
-  // Particles
   for (const pt of S.particles) {
-    ctx.fillStyle = pt.color;
-    ctx.globalAlpha = Math.max(0, pt.life);
+    ctx.fillStyle = pt.color; ctx.globalAlpha = Math.max(0, pt.life);
     ctx.fillRect(pt.x - pt.size/2, pt.y - pt.size/2, pt.size, pt.size);
   }
   ctx.globalAlpha = 1;
 
-  // Darkness in last 30 seconds
   if (S.running && S.timeLeft < 30 && S.timeLeft > 0) {
     const me = S.players[S.myId];
     if (me) {
       const flicker = 0.85 + Math.random() * 0.1;
       ctx.fillStyle = `rgba(0,0,0,${Math.min(0.85, (30 - S.timeLeft) / 30 * 0.85) * flicker})`;
-      ctx.fillRect(S.cam.x, S.cam.y, canvas.width, canvas.height);
-      // Light around me
-      const grad = ctx.createRadialGradient(
-        me.x + CFG.P_SIZE/2, me.y + CFG.P_SIZE/2, 20,
-        me.x + CFG.P_SIZE/2, me.y + CFG.P_SIZE/2, 200
-      );
-      grad.addColorStop(0, "rgba(0,0,0,0)");
-      grad.addColorStop(1, `rgba(0,0,0,${Math.min(0.85, (30 - S.timeLeft) / 30 * 0.85)})`);
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.fillStyle = "rgba(0,0,0,1)";
-      ctx.beginPath();
-      ctx.arc(me.x + CFG.P_SIZE/2, me.y + CFG.P_SIZE/2, 200, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalCompositeOperation = "source-over";
+      ctx.fillRect(camX, camY, canvas.width, canvas.height);
+      const grad = ctx.createRadialGradient(me.x + CFG.P_SIZE/2, me.y + CFG.P_SIZE/2, 20, me.x + CFG.P_SIZE/2, me.y + CFG.P_SIZE/2, 200);
+      grad.addColorStop(0, "rgba(0,0,0,0)"); grad.addColorStop(1, `rgba(0,0,0,${Math.min(0.85, (30 - S.timeLeft) / 30 * 0.85)})`);
+      ctx.globalCompositeOperation = "destination-out"; ctx.fillStyle = "rgba(0,0,0,1)"; ctx.beginPath();
+      ctx.arc(me.x + CFG.P_SIZE/2, me.y + CFG.P_SIZE/2, 200, 0, Math.PI * 2); ctx.fill(); ctx.globalCompositeOperation = "source-over";
     }
   }
 
   ctx.restore();
-
-  // On-screen controls (only if touch detected or small screen)
   drawControls();
 }
 
 function drawPlayer(p) {
-  const isGabri = p.id === S.gabriId;
-  const isMe = p.id === S.myId;
-
+  const isGabri = p.id === S.gabriId, isMe = p.id === S.myId;
   ctx.save();
-
-  // Stealth opacity
   if (p.isStealth) ctx.globalAlpha = 0.28;
+  ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.beginPath(); ctx.ellipse(p.x + CFG.P_SIZE/2, p.y + CFG.P_SIZE - 2, CFG.P_SIZE/2, 4, 0, 0, Math.PI*2); ctx.fill();
 
-  // Shadow
-  ctx.fillStyle = "rgba(0,0,0,0.5)";
-  ctx.beginPath();
-  ctx.ellipse(p.x + CFG.P_SIZE/2, p.y + CFG.P_SIZE - 2, CFG.P_SIZE/2, 4, 0, 0, Math.PI*2);
-  ctx.fill();
-
-  // Gabri aura
   if (isGabri && S.running) {
     ctx.fillStyle = `rgba(255, 46, 99, ${0.2 + Math.abs(Math.sin(performance.now()/150)) * 0.15})`;
-    ctx.beginPath();
-    ctx.arc(p.x + CFG.P_SIZE/2, p.y + CFG.P_SIZE/2, CFG.P_SIZE * 0.8, 0, Math.PI*2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x + CFG.P_SIZE/2, p.y + CFG.P_SIZE/2, CFG.P_SIZE * 0.8, 0, Math.PI*2); ctx.fill();
   }
 
-  // Body (pixel-style character)
-  const bodyColor = isGabri ? COL.danger : (p.color || COL.cool);
-  const headColor = "#ffd7b5";
-
-  // Legs (animated)
   const walkFrame = Math.floor(performance.now() / 120) % 2;
-  ctx.fillStyle = "#222";
   const legOff = walkFrame === 0 ? 0 : 2;
-  ctx.fillRect(p.x + 6, p.y + 22, 6, 8 - legOff);
-  ctx.fillRect(p.x + 16, p.y + 22, 6, 8 - (2 - legOff));
+  ctx.fillStyle = "#222";
+  ctx.fillRect(p.x + 6, p.y + 22, 6, 8 - legOff); ctx.fillRect(p.x + 16, p.y + 22, 6, 8 - (2 - legOff));
+  ctx.fillStyle = isGabri ? COL.danger : (p.color || COL.cool); ctx.fillRect(p.x + 4, p.y + 10, CFG.P_SIZE - 8, 14);
+  ctx.fillStyle = "#ffd7b5"; ctx.fillRect(p.x + 7, p.y + 2, CFG.P_SIZE - 14, 10);
+  ctx.fillStyle = isGabri ? "#6a0020" : "#3a3a4a"; ctx.fillRect(p.x + 7, p.y, CFG.P_SIZE - 14, 4);
+  ctx.fillStyle = isGabri ? COL.accent : "#000"; ctx.fillRect(p.x + 9, p.y + 6, 2, 2); ctx.fillRect(p.x + CFG.P_SIZE - 11, p.y + 6, 2, 2);
 
-  // Body
-  ctx.fillStyle = bodyColor;
-  ctx.fillRect(p.x + 4, p.y + 10, CFG.P_SIZE - 8, 14);
-
-  // Head
-  ctx.fillStyle = headColor;
-  ctx.fillRect(p.x + 7, p.y + 2, CFG.P_SIZE - 14, 10);
-
-  // Hair
-  ctx.fillStyle = isGabri ? "#6a0020" : "#3a3a4a";
-  ctx.fillRect(p.x + 7, p.y, CFG.P_SIZE - 14, 4);
-
-  // Eyes
-  ctx.fillStyle = isGabri ? COL.accent : "#000";
-  ctx.fillRect(p.x + 9, p.y + 6, 2, 2);
-  ctx.fillRect(p.x + CFG.P_SIZE - 11, p.y + 6, 2, 2);
-
-  // Stealth icon
-  if (p.isStealth) {
-    ctx.globalAlpha = 0.8;
-    ctx.fillStyle = COL.cool;
-    ctx.font = "bold 12px 'VT323'";
-    ctx.textAlign = "center";
-    ctx.fillText("◉", p.x + CFG.P_SIZE/2, p.y - 4);
-  }
-
+  if (p.isStealth) { ctx.globalAlpha = 0.8; ctx.fillStyle = COL.cool; ctx.font = "bold 12px 'VT323'"; ctx.textAlign = "center"; ctx.fillText("◉", p.x + CFG.P_SIZE/2, p.y - 4); }
   ctx.globalAlpha = 1;
 
-  // Held item
   if (p.heldItem) {
-    ctx.save();
-    ctx.translate(p.x + CFG.P_SIZE/2 + p.facing.x * 14, p.y + CFG.P_SIZE/2 + p.facing.y * 14);
-    const ang = Math.atan2(p.facing.y, p.facing.x);
-    ctx.rotate(ang + (p.swingT > 0 ? (p.swingT / 0.25) * Math.PI : 0));
-    if (p.heldItem === "ball") {
-      ctx.fillStyle = COL.warm;
-      ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
-    } else if (p.heldItem === "mg") {
-      ctx.fillStyle = "#222";
-      ctx.fillRect(-2, -3, 22, 6);
-      ctx.fillStyle = COL.accent;
-      ctx.fillRect(18, -2, 4, 4);
-    } else if (p.heldItem === "sword") {
-      ctx.fillStyle = "#cfcfe0";
-      ctx.fillRect(-2, -2, 22, 4);
-      ctx.fillStyle = COL.accent;
-      ctx.fillRect(-6, -4, 6, 8);
-    }
+    ctx.save(); ctx.translate(p.x + CFG.P_SIZE/2 + p.facing.x * 14, p.y + CFG.P_SIZE/2 + p.facing.y * 14);
+    ctx.rotate(Math.atan2(p.facing.y, p.facing.x) + (p.swingT > 0 ? (p.swingT / 0.25) * Math.PI : 0));
+    if (p.heldItem === "ball") { ctx.fillStyle = COL.warm; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill(); }
+    else if (p.heldItem === "mg") { ctx.fillStyle = "#222"; ctx.fillRect(-2, -3, 22, 6); ctx.fillStyle = COL.accent; ctx.fillRect(18, -2, 4, 4); }
+    else if (p.heldItem === "sword") { ctx.fillStyle = "#cfcfe0"; ctx.fillRect(-2, -2, 22, 4); ctx.fillStyle = COL.accent; ctx.fillRect(-6, -4, 6, 8); }
     ctx.restore();
   }
 
-  // Name tag
   if (!p.isStealth) {
     const name = p.name + (isMe ? " (YOU)" : "");
-    ctx.font = "bold 11px 'VT323', monospace";
-    const tw = ctx.measureText(name).width;
-    ctx.fillStyle = "rgba(0,0,0,0.7)";
-    ctx.fillRect(p.x + CFG.P_SIZE/2 - tw/2 - 3, p.y - 14, tw + 6, 12);
-    ctx.fillStyle = isGabri ? COL.danger : (isMe ? COL.accent : COL.ink);
-    ctx.textAlign = "center";
-    ctx.fillText(name, p.x + CFG.P_SIZE/2, p.y - 4);
+    ctx.font = "bold 11px 'VT323', monospace"; const tw = ctx.measureText(name).width;
+    ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(p.x + CFG.P_SIZE/2 - tw/2 - 3, p.y - 14, tw + 6, 12);
+    ctx.fillStyle = isGabri ? COL.danger : (isMe ? COL.accent : COL.ink); ctx.textAlign = "center"; ctx.fillText(name, p.x + CFG.P_SIZE/2, p.y - 4);
   }
-
   ctx.restore();
 }
 
 function drawBoss() {
   const b = S.boss;
-  // Shadow
-  ctx.fillStyle = "rgba(0,0,0,0.7)";
-  ctx.beginPath();
-  ctx.ellipse(b.x + 40, b.y + 82, 42, 8, 0, 0, Math.PI*2);
-  ctx.fill();
-  // Aura
-  ctx.fillStyle = `rgba(255,46,99,${0.2 + Math.abs(Math.sin(performance.now()/200)) * 0.2})`;
-  ctx.beginPath();
-  ctx.arc(b.x + 40, b.y + 40, 70, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Mecha body
-  ctx.fillStyle = "#1a0a0a";
-  ctx.fillRect(b.x + 10, b.y + 20, 60, 50);
-  ctx.fillStyle = COL.danger;
-  ctx.fillRect(b.x + 14, b.y + 24, 52, 8);
-  ctx.fillStyle = "#2a1010";
-  ctx.fillRect(b.x + 14, b.y + 38, 52, 28);
-  // Eyes
-  ctx.fillStyle = COL.accent;
-  ctx.fillRect(b.x + 22, b.y + 44, 8, 6);
-  ctx.fillRect(b.x + 50, b.y + 44, 8, 6);
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(b.x + 24, b.y + 45, 2, 2);
-  ctx.fillRect(b.x + 52, b.y + 45, 2, 2);
-  // Arms
-  ctx.fillStyle = "#1a0a0a";
-  ctx.fillRect(b.x + 0, b.y + 30, 14, 40);
-  ctx.fillRect(b.x + 66, b.y + 30, 14, 40);
-  // Legs
-  ctx.fillStyle = "#1a0a0a";
-  ctx.fillRect(b.x + 16, b.y + 70, 18, 12);
-  ctx.fillRect(b.x + 46, b.y + 70, 18, 12);
-  // HP
-  ctx.fillStyle = "#000";
-  ctx.fillRect(b.x, b.y - 14, 80, 8);
-  ctx.fillStyle = COL.danger;
-  ctx.fillRect(b.x + 1, b.y - 13, (80 - 2) * (b.hp / CFG.BOSS_HP), 6);
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 10px 'VT323'";
-  ctx.textAlign = "center";
-  ctx.fillText("ISHIN", b.x + 40, b.y - 18);
+  ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.beginPath(); ctx.ellipse(b.x + 40, b.y + 82, 42, 8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = `rgba(255,46,99,${0.2 + Math.abs(Math.sin(performance.now()/200)) * 0.2})`; ctx.beginPath(); ctx.arc(b.x + 40, b.y + 40, 70, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#1a0a0a"; ctx.fillRect(b.x + 10, b.y + 20, 60, 50);
+  ctx.fillStyle = COL.danger; ctx.fillRect(b.x + 14, b.y + 24, 52, 8);
+  ctx.fillStyle = "#2a1010"; ctx.fillRect(b.x + 14, b.y + 38, 52, 28);
+  ctx.fillStyle = COL.accent; ctx.fillRect(b.x + 22, b.y + 44, 8, 6); ctx.fillRect(b.x + 50, b.y + 44, 8, 6);
+  ctx.fillStyle = "#fff"; ctx.fillRect(b.x + 24, b.y + 45, 2, 2); ctx.fillRect(b.x + 52, b.y + 45, 2, 2);
+  ctx.fillStyle = "#1a0a0a"; ctx.fillRect(b.x + 0, b.y + 30, 14, 40); ctx.fillRect(b.x + 66, b.y + 30, 14, 40);
+  ctx.fillRect(b.x + 16, b.y + 70, 18, 12); ctx.fillRect(b.x + 46, b.y + 70, 18, 12);
+  ctx.fillStyle = "#000"; ctx.fillRect(b.x, b.y - 14, 80, 8);
+  ctx.fillStyle = COL.danger; ctx.fillRect(b.x + 1, b.y - 13, (80 - 2) * (b.hp / CFG.BOSS_HP), 6);
+  ctx.fillStyle = "#fff"; ctx.font = "bold 10px 'VT323'"; ctx.textAlign = "center"; ctx.fillText("ISHIN", b.x + 40, b.y - 18);
 }
 
 function drawCheerleaders() {
-  // Cheerleaders at both sides of gym
   if (!MAP.hoops.length) return;
-  const dancing = S.cheerDance < 3;
-  const t = performance.now();
+  const dancing = S.cheerDance < 3, t = performance.now();
   const positions = [
-    { x: MAP.hoops[0].x + 50, y: MAP.hoops[0].y + 60, c: COL.danger },
-    { x: MAP.hoops[0].x + 80, y: MAP.hoops[0].y + 60, c: COL.cool },
-    { x: MAP.hoops[1].x - 50, y: MAP.hoops[1].y + 60, c: COL.danger },
-    { x: MAP.hoops[1].x - 80, y: MAP.hoops[1].y + 60, c: COL.cool },
+    { x: MAP.hoops[0].x + 50, y: MAP.hoops[0].y + 60, c: COL.danger }, { x: MAP.hoops[0].x + 80, y: MAP.hoops[0].y + 60, c: COL.cool },
+    { x: MAP.hoops[1].x - 50, y: MAP.hoops[1].y + 60, c: COL.danger }, { x: MAP.hoops[1].x - 80, y: MAP.hoops[1].y + 60, c: COL.cool },
   ];
   positions.forEach((p, i) => {
-    const bounce = dancing ? Math.abs(Math.sin(t / 120 + i)) * 8 : 0;
-    const y = p.y - bounce;
-
-    // Pom poms
+    const bounce = dancing ? Math.abs(Math.sin(t / 120 + i)) * 8 : 0, y = p.y - bounce;
     const armY = dancing ? y - 6 - bounce : y;
-    ctx.fillStyle = COL.accent;
-    ctx.beginPath(); ctx.arc(p.x - 8, armY, 5, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(p.x + 8, armY, 5, 0, Math.PI*2); ctx.fill();
-
-    // Body
-    ctx.fillStyle = p.c;
-    ctx.fillRect(p.x - 5, y, 10, 14);
-    // Head
-    ctx.fillStyle = "#ffd7b5";
-    ctx.fillRect(p.x - 4, y - 10, 8, 8);
-    // Skirt flare
-    ctx.fillStyle = p.c;
-    ctx.fillRect(p.x - 7, y + 12, 14, 3);
-
-    if (dancing && Math.random() < 0.04) {
-      Phys.spawnParticles(p.x, y, COL.accent, 3);
-    }
+    ctx.fillStyle = COL.accent; ctx.beginPath(); ctx.arc(p.x - 8, armY, 5, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(p.x + 8, armY, 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = p.c; ctx.fillRect(p.x - 5, y, 10, 14); ctx.fillStyle = "#ffd7b5"; ctx.fillRect(p.x - 4, y - 10, 8, 8);
+    ctx.fillStyle = p.c; ctx.fillRect(p.x - 7, y + 12, 14, 3);
+    if (dancing && Math.random() < 0.04) Phys.spawnParticles(p.x, y, COL.accent, 3);
   });
 }
 
 function drawControls() {
   if (!("ontouchstart" in window) && window.innerWidth > 900) return;
-  const w = canvas.width, h = canvas.height;
-
   ctx.save();
-  // Joystick base
-  ctx.strokeStyle = "rgba(243,243,255,0.3)";
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(IN.joy.bx, IN.joy.by, IN.joy.r, 0, Math.PI*2); ctx.stroke();
-  // Stick
-  ctx.fillStyle = "rgba(252,238,10,0.5)";
-  ctx.beginPath(); ctx.arc(IN.joy.nx, IN.joy.ny, 22, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = "rgba(243,243,255,0.3)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(IN.joy.bx, IN.joy.by, IN.joy.r, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = "rgba(252,238,10,0.5)"; ctx.beginPath(); ctx.arc(IN.joy.nx, IN.joy.ny, 22, 0, Math.PI*2); ctx.fill();
   ctx.strokeStyle = COL.ink; ctx.lineWidth = 2; ctx.stroke();
-
-  // Button A
-  drawBtn(IN.btnA, "A", COL.danger);
-  // Button B
-  drawBtn(IN.btnB, "B", COL.cool);
-  // Button C
-  drawBtn(IN.btnC, "C", COL.accent);
-
+  drawBtn(IN.btnA, "A", COL.danger); drawBtn(IN.btnB, "B", COL.cool); drawBtn(IN.btnC, "C", COL.accent);
   ctx.restore();
 }
 function drawBtn(b, label, col) {
-  ctx.fillStyle = b.active ? col : "rgba(0,0,0,0.5)";
-  ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = b.active ? col : "rgba(0,0,0,0.5)"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill();
   ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
-  ctx.fillStyle = b.active ? "#000" : COL.ink;
-  ctx.font = "bold 18px 'Rubik Mono One', monospace";
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText(label, b.x, b.y);
+  ctx.fillStyle = b.active ? "#000" : COL.ink; ctx.font = "bold 18px 'Rubik Mono One', monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(label, b.x, b.y);
 }
 
 /* ========================================================================
-   13. HUD UPDATE
+   10. HUD & UI
    ======================================================================== */
 function updateHud() {
   if (!S.running) return;
-  const min = Math.max(0, Math.floor(S.timeLeft / 60));
-  const sec = Math.max(0, Math.floor(S.timeLeft % 60));
-  const timerEl = $("timer");
-  timerEl.textContent = `${min.toString().padStart(2,"0")}:${sec.toString().padStart(2,"0")}`;
+  const min = Math.max(0, Math.floor(S.timeLeft / 60)), sec = Math.max(0, Math.floor(S.timeLeft % 60));
+  const timerEl = $("timer"); timerEl.textContent = `${min.toString().padStart(2,"0")}:${sec.toString().padStart(2,"0")}`;
   timerEl.classList.toggle("low", S.timeLeft < 30);
 
   const role = $("role"), card = $("statusCard"), info = $("infoRow");
-  if (S.gabriId === S.myId) {
-    role.textContent = "DU BIST GABRI";
-    role.className = "role-line me";
-    card.classList.add("danger");
-  } else {
-    const g = S.players[S.gabriId];
-    role.textContent = g ? `FLIEH! ${g.name} JAGT` : "WARMUP";
-    role.className = "role-line flee";
-    card.classList.remove("danger");
-  }
-  const me = S.players[S.myId];
-  if (me) info.textContent = `DEINE ZEIT ALS GABRI: ${me.timeAsGabri.toFixed(1)}s`;
+  if (S.gabriId === S.myId) { role.textContent = "DU BIST GABRI"; role.className = "role-line me"; card.classList.add("danger"); }
+  else { const g = S.players[S.gabriId]; role.textContent = g ? `FLIEH! ${g.name} JAGT` : "WARMUP"; role.className = "role-line flee"; card.classList.remove("danger"); }
+  const me = S.players[S.myId]; if (me) info.textContent = `DEINE ZEIT ALS GABRI: ${me.timeAsGabri.toFixed(1)}s`;
 
-  // Mini scoreboard (sorted by time as gabri — lowest best)
-  const mb = $("miniBoard");
-  const sorted = Object.values(S.players).sort((a,b) => a.timeAsGabri - b.timeAsGabri);
+  const mb = $("miniBoard"), sorted = Object.values(S.players).sort((a,b) => a.timeAsGabri - b.timeAsGabri);
   mb.innerHTML = sorted.map(p => {
-    const isMe = p.id === S.myId;
-    const isLead = p.id === S.gabriId;
+    const isMe = p.id === S.myId, isLead = p.id === S.gabriId;
     return `<div class="mini-row ${isLead ? "lead" : ""}"><span class="${isMe ? "self" : ""}">${p.name}${isMe ? "*" : ""}</span><span>${p.timeAsGabri.toFixed(1)}s</span></div>`;
   }).join("");
 }
 
-/* ========================================================================
-   14. UI HELPERS
-   ======================================================================== */
 function showScreen(name) {
   ["s-main","s-lobby","s-over"].forEach(s => $(s).classList.remove("on"));
-  if (name) { $("s-" + name).classList.add("on"); $("ui").style.display = "flex"; }
-  else { $("ui").style.display = "none"; }
+  if (name) { $("s-" + name).classList.add("on"); $("ui").style.display = "flex"; } else { $("ui").style.display = "none"; }
   S.screen = name;
 }
-
 function flashBanner(text, duration = 1500) {
-  const b = $("banner");
-  b.textContent = text;
-  b.classList.add("on");
-  clearTimeout(S.bannerTimer);
-  S.bannerTimer = setTimeout(() => b.classList.remove("on"), duration);
+  const b = $("banner"); b.textContent = text; b.classList.add("on");
+  clearTimeout(S.bannerTimer); S.bannerTimer = setTimeout(() => b.classList.remove("on"), duration);
 }
-
 function showToast(text) {
-  const t = $("toast");
-  t.textContent = text;
-  t.classList.add("on");
-  clearTimeout(S.toastTimer);
-  S.toastTimer = setTimeout(() => t.classList.remove("on"), 2500);
+  const t = $("toast"); t.textContent = text; t.classList.add("on");
+  clearTimeout(S.toastTimer); S.toastTimer = setTimeout(() => t.classList.remove("on"), 2500);
 }
-
 function renderLobby() {
-  const list = $("plist");
-  list.innerHTML = Object.values(S.players).map(p => {
+  $("plist").innerHTML = Object.values(S.players).map(p => {
     const isMe = p.id === S.myId;
-    return `<div class="prow"><span><span class="dot"></span><span class="${isMe ? "me" : ""}">${p.name}${isMe ? " (du)" : ""}</span>${p.isHost ? '<span class="host">★ HOST</span>' : ""}</span><span style="color:var(--dim)">${p.isBot ? "BOT" : "ONLINE"}</span></div>`;
+    return `<div class="prow"><span><span class="dot"></span><span class="${isMe ? "me" : ""}">${p.name}${isMe ? " (du)" : ""}</span></span><span style="color:var(--dim)">${p.isBot ? "BOT" : "LOKAL"}</span></div>`;
   }).join("");
 }
 
 /* ========================================================================
-   15. GAME START / END
+   11. GAME LOGIC
    ======================================================================== */
 function createPlayer(id, name, opts = {}) {
   return {
-    id, name,
-    x: opts.x ?? (MAP.spawn.x + (Math.random() - 0.5) * 200),
-    y: opts.y ?? (MAP.spawn.y + (Math.random() - 0.5) * 200),
-    vx: 0, vy: 0,
-    inputDx: 0, inputDy: 0,
-    facing: { x: 1, y: 0 },
-    heldItem: null,
-    stillT: 0, isStealth: false,
-    timeAsGabri: 0,
-    isBot: !!opts.isBot,
-    color: opts.color || COL.cool,
-    dashT: 0, dashCd: 0, tagCd: 0,
-    swingT: 0,
-    kbvx: 0, kbvy: 0,
-    isHost: !!opts.isHost
+    id, name, x: opts.x ?? (MAP.spawn.x + (Math.random() - 0.5) * 200), y: opts.y ?? (MAP.spawn.y + (Math.random() - 0.5) * 200),
+    vx: 0, vy: 0, inputDx: 0, inputDy: 0, facing: { x: 1, y: 0 }, heldItem: null, stillT: 0, isStealth: false,
+    timeAsGabri: 0, isBot: !!opts.isBot, color: opts.color || COL.cool, dashT: 0, dashCd: 0, tagCd: 0, swingT: 0, kbvx: 0, kbvy: 0
   };
 }
 
-async function startGame() {
-  const mode = $("inMode").value;
+function startGame() {
   const name = ($("inName").value || "RUNNER").toUpperCase().substring(0, 10);
-  S.mode = mode;
-  S.myName = name;
+  S.myName = name; sfx.enable();
 
-  sfx.enable();
-
-  // Reset state
-  S.players = {};
-  S.ball = { x: MAP.hoops[0].x + 100, y: MAP.hoops[0].y + 60, vx: 0, vy: 0, z: 0, vz: 0, owner: null, active: true };
-  S.particles = [];
-  S.mg = null;
-  S.boss = null;
-  S.swords = [];
-  S.timeLeft = CFG.ROUND_SECONDS;
-  S.cheerDance = 999;
-
-  // Reset pallets
+  S.players = {}; S.ball = { x: MAP.hoops[0].x + 100, y: MAP.hoops[0].y + 60, vx: 0, vy: 0, z: 0, vz: 0, owner: null, active: true };
+  S.particles = []; S.mg = null; S.boss = null; S.swords = []; S.timeLeft = CFG.ROUND_SECONDS; S.cheerDance = 999;
   for (const p of MAP.pallets) { p.state = 0; p.cd = 0; }
 
-  if (mode === "solo") {
-    // Generate my player + bots
-    S.myId = "me";
-    S.isHost = true;
-    S.players["me"] = createPlayer("me", name, { isHost: true, x: MAP.spawn.x, y: MAP.spawn.y, color: COL.accent });
+  S.myId = "me";
+  S.players["me"] = createPlayer("me", name, { x: MAP.spawn.x, y: MAP.spawn.y, color: COL.accent });
 
-    for (let i = 0; i < CFG.NUM_BOTS; i++) {
-      const id = "bot_" + i;
-      const bname = BOT_NAMES[i % BOT_NAMES.length];
-      S.players[id] = createPlayer(id, bname, {
-        isBot: true, color: BOT_COLORS[i % BOT_COLORS.length],
-        x: MAP.spawn.x + Math.random() * 300 - 100,
-        y: MAP.spawn.y + Math.random() * 300 - 100
-      });
-    }
-
-    // Pick random gabri (not me)
-    const ids = Object.keys(S.players).filter(id => id !== "me");
-    S.gabriId = ids[Math.floor(Math.random() * ids.length)];
-
-    $("lobbyTag").textContent = "SOLO vs BOTS";
-    renderLobby();
-    showScreen("lobby");
-
-    S.running = false;
-    beginLoop();
-  } else {
-    // Multiplayer
-    if (!fb) { showToast("Firebase offline — starte Solo-Modus."); $("inMode").value = "solo"; return; }
-
-    $("btnPlay").disabled = true;
-    $("btnPlay").textContent = "VERBINDE...";
-    try {
-      // Auth
-      if (!fb.auth.currentUser) await fb.signInAnonymously(fb.auth);
-      S.myId = fb.auth.currentUser.uid;
-      S.roomId = mode;
-
-      // Register self
-      await fb.setDoc(fb.doc(fb.db, "gabri2", S.roomId, "players", S.myId), {
-        id: S.myId, name, x: MAP.spawn.x, y: MAP.spawn.y,
-        facingX: 1, facingY: 0, heldItem: null,
-        isStealth: false, timeAsGabri: 0, dashT: 0,
-        lastSeen: Date.now()
-      });
-
-      // Add local
-      S.players[S.myId] = createPlayer(S.myId, name, { x: MAP.spawn.x, y: MAP.spawn.y, color: COL.accent });
-
-      // Setup listener
-      const plRef = fb.collection(fb.db, "gabri2", S.roomId, "players");
-      const unsub = fb.onSnapshot(plRef, (snap) => {
-        const now = Date.now();
-        snap.forEach(docSnap => {
-          const d = docSnap.data();
-          if (!d.lastSeen || now - d.lastSeen > 15000) {
-            delete S.players[d.id];
-            return;
-          }
-          if (d.id === S.myId) return;
-          if (!S.players[d.id]) {
-            S.players[d.id] = createPlayer(d.id, d.name, { x: d.x, y: d.y, color: "#ff8a3c" });
-          }
-          const p = S.players[d.id];
-          p.x = d.x; p.y = d.y;
-          p.facing.x = d.facingX ?? 1;
-          p.facing.y = d.facingY ?? 0;
-          p.heldItem = d.heldItem;
-          p.isStealth = d.isStealth;
-          p.timeAsGabri = d.timeAsGabri || 0;
-        });
-        renderLobby();
-      });
-      S.fbUnsub.push(unsub);
-
-      // Room doc (state)
-      const roomRef = fb.doc(fb.db, "gabri2", S.roomId);
-      const roomSnap = await fb.onSnapshot(roomRef, (snap) => {
-        if (!snap.exists()) return;
-        const d = snap.data();
-        S.gabriId = d.gabriId;
-        S.timeLeft = d.timeLeft ?? CFG.ROUND_SECONDS;
-        S.running = d.running;
-        S.isHost = d.hostId === S.myId;
-        if (d.running && S.screen !== "game") {
-          showScreen(null);
-          $("hud").classList.add("on");
-        }
-      });
-      S.fbUnsub.push(roomSnap);
-
-      $("lobbyTag").textContent = "ONLINE · " + mode.toUpperCase();
-      renderLobby();
-      showScreen("lobby");
-      beginLoop();
-
-    } catch (e) {
-      console.error(e);
-      showToast("Verbindung fehlgeschlagen: " + e.message);
-      $("btnPlay").disabled = false;
-      $("btnPlay").textContent = "EINSTEIGEN";
-    }
-    $("btnPlay").disabled = false;
-    $("btnPlay").textContent = "EINSTEIGEN";
-  }
-}
-
-async function syncPlayerPos(me) {
-  if (!fb || !S.roomId) return;
-  try {
-    await fb.updateDoc(fb.doc(fb.db, "gabri2", S.roomId, "players", S.myId), {
-      x: Math.round(me.x), y: Math.round(me.y),
-      facingX: me.facing.x, facingY: me.facing.y,
-      heldItem: me.heldItem,
-      isStealth: me.isStealth,
-      timeAsGabri: me.timeAsGabri,
-      lastSeen: Date.now()
+  for (let i = 0; i < CFG.NUM_BOTS; i++) {
+    const id = "bot_" + i;
+    S.players[id] = createPlayer(id, BOT_NAMES[i % BOT_NAMES.length], {
+      isBot: true, color: BOT_COLORS[i % BOT_COLORS.length], x: MAP.spawn.x + Math.random() * 300 - 100, y: MAP.spawn.y + Math.random() * 300 - 100
     });
-  } catch (e) {}
+  }
+
+  const ids = Object.keys(S.players).filter(id => id !== "me");
+  S.gabriId = ids[Math.floor(Math.random() * ids.length)];
+
+  $("lobbyTag").textContent = "SOLO vs BOTS"; renderLobby(); showScreen("lobby");
+  if(!S.loopStarted) { S.loopStarted = true; beginLoop(); }
 }
 
 function triggerRound() {
-  S.running = true;
-  S.timeLeft = CFG.ROUND_SECONDS;
-
-  // Pick random gabri
-  const ids = Object.keys(S.players);
-  if (!S.gabriId || !S.players[S.gabriId] || S.mode !== "solo") {
-    S.gabriId = ids[Math.floor(Math.random() * ids.length)];
-  }
-
-  // Reset times
+  S.running = true; S.timeLeft = CFG.ROUND_SECONDS;
   for (const id in S.players) S.players[id].timeAsGabri = 0;
-
-  // Hide menu, show HUD
-  showScreen(null);
-  $("hud").classList.add("on");
-  sfx.start();
-
+  showScreen(null); $("hud").classList.add("on"); sfx.start();
   const gName = S.players[S.gabriId]?.name || "???";
-  if (S.gabriId === S.myId) flashBanner("DU BIST GABRI! JAGE SIE!", 2500);
-  else flashBanner(`${gName} IST GABRI! FLIEH!`, 2500);
+  if (S.gabriId === S.myId) flashBanner("DU BIST GABRI! JAGE SIE!", 2500); else flashBanner(`${gName} IST GABRI! FLIEH!`, 2500);
 }
 
 function endRound() {
-  S.running = false;
-  sfx.end();
-  $("hud").classList.remove("on");
-
-  // Ranks
+  S.running = false; sfx.end(); $("hud").classList.remove("on");
   const sorted = Object.values(S.players).sort((a, b) => a.timeAsGabri - b.timeAsGabri);
-  const ranksDiv = $("ranks");
-  ranksDiv.innerHTML = sorted.map((p, i) => {
+  $("ranks").innerHTML = sorted.map((p, i) => {
     const cls = i === 0 ? "best" : (i === sorted.length - 1 ? "worst" : "");
     return `<div class="rank ${cls}"><span><span class="pos">#${i+1}</span>${p.name}${p.id === S.myId ? " (DU)" : ""}</span><span>${p.timeAsGabri.toFixed(1)}s</span></div>`;
   }).join("");
 
-  const loser = sorted[sorted.length - 1];
-  const winner = sorted[0];
+  const loser = sorted[sorted.length - 1], winner = sorted[0];
   $("overTitle").textContent = winner.id === S.myId ? "SIEG!" : "RUNDE ENDE";
   $("overTerm").innerHTML = `<span class="warn">&gt; GABRI DES SPIELS: ${loser.name}</span><br><span class="dim">&gt; Zeit als Gabri: ${loser.timeAsGabri.toFixed(1)}s</span><br><span class="good">&gt; Sieger: ${winner.name}</span>`;
-
   showScreen("over");
 }
 
-/* ========================================================================
-   16. MAIN LOOP
-   ======================================================================== */
 function beginLoop() {
   S.lastTick = performance.now();
   function frame(ts) {
-    const dt = Math.min(0.05, (ts - S.lastTick) / 1000);
-    S.lastTick = ts;
-    update(dt);
-    draw();
-    updateHud();
-    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (ts - S.lastTick) / 1000); S.lastTick = ts;
+    update(dt); draw(); updateHud(); requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 }
 
 /* ========================================================================
-   17. EVENTS
+   12. EVENTS & INIT
    ======================================================================== */
 $("btnPlay").addEventListener("click", startGame);
-$("btnStart").addEventListener("click", () => { triggerRound(); });
-$("btnLeave").addEventListener("click", () => {
-  leaveMultiplayer();
-  showScreen("main");
-});
-$("btnAgain").addEventListener("click", () => { triggerRound(); });
-$("btnHome").addEventListener("click", () => {
-  leaveMultiplayer();
-  showScreen("main");
-});
+$("btnStart").addEventListener("click", triggerRound);
+$("btnLeave").addEventListener("click", () => { S.running = false; showScreen("main"); });
+$("btnAgain").addEventListener("click", triggerRound);
+$("btnHome").addEventListener("click", () => { S.running = false; showScreen("main"); });
 
-async function leaveMultiplayer() {
-  S.running = false;
-  $("hud").classList.remove("on");
-  S.fbUnsub.forEach(u => { try { u(); } catch (e) {} });
-  S.fbUnsub = [];
-  if (fb && S.roomId && S.myId) {
-    try { await fb.deleteDoc(fb.doc(fb.db, "gabri2", S.roomId, "players", S.myId)); } catch (e) {}
-  }
-  S.players = {};
-}
-
-// Terminal boot
-const term = $("term");
+// Terminal boot sequence
 async function boot() {
   const lines = [
-    { t: '<span class="dim">&gt; booting gabri.exe v2.0...</span>', d: 300 },
-    { t: '<span class="dim">&gt; loading arena: schulplatz_alpha</span>', d: 400 },
-    { t: '<span class="good">&gt; ready. enter handle to play.</span>', d: 300 }
+    { t: '<span class="dim">&gt; booting gabri.exe v3.0...</span>', d: 300 },
+    { t: '<span class="dim">&gt; loading local arena parameters...</span>', d: 200 },
+    { t: '<span class="good">&gt; system ready. engage.</span>', d: 300 }
   ];
   let acc = "";
-  for (const l of lines) {
-    await new Promise(r => setTimeout(r, l.d));
-    acc += l.t + "<br>";
-    term.innerHTML = acc;
-  }
+  for (const l of lines) { await new Promise(r => setTimeout(r, l.d)); acc += l.t + "<br>"; $("term").innerHTML = acc; }
   $("btnPlay").disabled = false;
 }
 $("btnPlay").disabled = true;
 boot();
 
-// Autofill name
 $("inName").value = ("RUN" + Math.floor(Math.random() * 999)).padEnd(3, "X");
-
-// Prevent context menu
 window.addEventListener("contextmenu", e => e.preventDefault());
-
-// Heartbeat for MP
-setInterval(async () => {
-  if (fb && S.mode !== "solo" && S.roomId && S.myId && S.players[S.myId]) {
-    try { await fb.updateDoc(fb.doc(fb.db, "gabri2", S.roomId, "players", S.myId), { lastSeen: Date.now() }); } catch (e) {}
-  }
-}, 3000);
-
 </script>
 </body>
 </html>
